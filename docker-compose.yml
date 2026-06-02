@@ -1,0 +1,48 @@
+# SQLite file DB — all persistent data lives in ./data/ on the host
+services:
+  migrate:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/iclouddownloader.db}
+      BASE_DOWNLOAD_DIR: /data/downloads
+      COOKIE_DIR: /data/cookies
+      RUN_MIGRATIONS: "true"
+    volumes:
+      - ./data:/data
+    command: ["true"]
+    restart: "no"
+
+  api:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/iclouddownloader.db}
+      BASE_DOWNLOAD_DIR: /data/downloads
+      COOKIE_DIR: /data/cookies
+      WEB_HOST: 0.0.0.0
+      WEB_PORT: ${WEB_PORT:-8765}
+    ports:
+      - "${WEB_PORT:-8765}:${WEB_PORT:-8765}"
+    volumes:
+      - ./data:/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["iclouddownloader", "web", "start"]
+    restart: unless-stopped
+
+  worker:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/iclouddownloader.db}
+      BASE_DOWNLOAD_DIR: /data/downloads
+      COOKIE_DIR: /data/cookies
+    volumes:
+      - ./data:/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["iclouddownloader", "daemon", "start"]
+    restart: unless-stopped

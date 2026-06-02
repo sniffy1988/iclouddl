@@ -1,0 +1,176 @@
+from __future__ import annotations
+
+from datetime import datetime
+
+from pydantic import BaseModel, Field
+
+
+class LoginRequest(BaseModel):
+    password: str
+
+
+class UserCreate(BaseModel):
+    apple_id: str
+    display_name: str | None = None
+    download_dir: str | None = None
+    sync_interval_seconds: int | None = None
+    library_key: str = "root"
+    telegram_notify: bool = True
+
+
+class UserUpdate(BaseModel):
+    display_name: str | None = None
+    download_dir: str | None = None
+    sync_interval_seconds: int | None = None
+    enabled: bool | None = None
+    library_key: str | None = None
+    telegram_notify: bool | None = None
+
+
+class UserResponse(BaseModel):
+    id: int
+    apple_id: str
+    display_name: str | None
+    download_dir: str
+    sync_interval_seconds: int
+    enabled: bool
+    library_key: str
+    telegram_notify: bool
+    next_sync_at: datetime | None
+    last_sync_at: datetime | None
+    last_sync_status: str | None
+    auth_status: str = "not_authorized"
+    activity_status: str = "idle"
+    icloud_photos_count: int | None = None
+    icloud_photos_count_at: datetime | None = None
+    downloaded_count: int = 0
+    remaining_to_download: int | None = None
+    icloud_authenticated_at: datetime | None = None
+    icloud_2fa_at: datetime | None = None
+    icloud_session_ok_at: datetime | None = None
+    icloud_needs_auth: bool = True
+    icloud_authorized: bool = False
+    icloud_2fa_expires_at: datetime | None = None
+    days_until_2fa_expires: int | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class SyncRunResponse(BaseModel):
+    id: int
+    user_id: int
+    started_at: datetime
+    finished_at: datetime | None
+    status: str
+    photos_discovered: int
+    photos_downloaded: int
+    photos_failed: int
+    photos_skipped: int
+    error_summary: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class PhotoResponse(BaseModel):
+    id: int
+    user_id: int
+    icloud_asset_id: str
+    filename: str
+    local_path: str | None
+    file_size: int | None
+    checksum_sha256: str | None
+    asset_date: datetime | None
+    media_type: str | None
+    status: str
+    downloaded_at: datetime | None
+    error_message: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class UserICloudLoginRequest(BaseModel):
+    password: str = Field(min_length=1)
+
+
+class UserICloudLoginResponse(BaseModel):
+    ok: bool
+    status: str
+    message: str
+    challenge_type: str | None = None
+    challenge_id: int | None = None
+
+
+class AuthChallengeRequest(BaseModel):
+    code: str = Field(min_length=4, max_length=8)
+    challenge_id: int | None = None
+    password: str | None = None
+
+
+class AuthChallengeResponse(BaseModel):
+    id: int
+    user_id: int
+    challenge_type: str
+    status: str
+    expires_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PhotoCountResponse(BaseModel):
+    user_id: int
+    icloud_photos_count: int | None
+    icloud_photos_count_at: datetime | None
+    downloaded_count: int
+    tracked_count: int
+    remaining_to_download: int | None = None
+
+
+class FetchCountResponse(BaseModel):
+    ok: bool
+    message: str
+    user_id: int
+    already_running: bool = False
+
+
+class TriggerSyncResponse(BaseModel):
+    ok: bool
+    message: str
+    user_id: int
+    sync_run_id: int | None = None
+    already_running: bool = False
+
+
+class DashboardStats(BaseModel):
+    total_users: int
+    enabled_users: int
+    total_photos: int
+    downloaded_today: int
+    active_syncs: int
+    failed_syncs: int
+    users_due_for_sync: int
+
+
+class SettingsResponse(BaseModel):
+    telegram_enabled: bool
+    telegram_bot_token_set: bool = False
+    telegram_bot_token_masked: str = ""
+    telegram_admin_chat_id: str = ""
+    telegram_allowed_user_ids: str = ""
+    download_path_template: str = "YYYY/MM/DD/{filename}"
+    default_sync_interval_seconds: int
+    max_concurrent_downloads: int
+    scheduler_poll_seconds: int
+    base_download_dir: str
+
+
+class SettingsUpdate(BaseModel):
+    telegram_enabled: bool | None = None
+    telegram_bot_token: str | None = None
+    telegram_admin_chat_id: str | None = None
+    telegram_allowed_user_ids: str | None = None
+    download_path_template: str | None = None
+    default_sync_interval_seconds: int | None = Field(default=None, ge=300)
+    max_concurrent_downloads: int | None = Field(default=None, ge=1, le=32)
+    scheduler_poll_seconds: int | None = Field(default=None, ge=10, le=3600)

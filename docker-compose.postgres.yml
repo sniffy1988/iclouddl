@@ -1,0 +1,63 @@
+# Optional PostgreSQL instead of SQLite file DB:
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-iclouddownloader}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-iclouddownloader}
+      POSTGRES_DB: ${POSTGRES_DB:-iclouddownloader}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-iclouddownloader} -d ${POSTGRES_DB:-iclouddownloader}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  migrate:
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-iclouddownloader}:${POSTGRES_PASSWORD:-iclouddownloader}@postgres:5432/${POSTGRES_DB:-iclouddownloader}
+    volumes:
+      - downloads:/data/downloads
+      - cookies:/data/cookies
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-iclouddownloader}:${POSTGRES_PASSWORD:-iclouddownloader}@postgres:5432/${POSTGRES_DB:-iclouddownloader}
+    volumes:
+      - downloads:/data/downloads
+      - cookies:/data/cookies
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-iclouddownloader}:${POSTGRES_PASSWORD:-iclouddownloader}@postgres:5432/${POSTGRES_DB:-iclouddownloader}
+    volumes:
+      - downloads:/data/downloads
+      - cookies:/data/cookies
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  downloads:
+  cookies:

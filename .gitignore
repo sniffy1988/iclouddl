@@ -1,0 +1,17 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+dist/
+build/
+*.egg-info/
+web/node_modules/
+web/dist/
+.cookies/
+data/*
+!data/.gitkeep
+!data/downloads/.gitkeep
+!data/cookies/.gitkeep
+*.db

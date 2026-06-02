@@ -1,0 +1,11 @@
+# Production overlay: pull pre-built image from GHCR (see .github/workflows/deploy.yml).
+# export DOCKER_IMAGE=ghcr.io/<owner>/iclouddownloader:latest
+services:
+  migrate:
+    image: ${DOCKER_IMAGE:?Set DOCKER_IMAGE}
+
+  api:
+    image: ${DOCKER_IMAGE}
+
+  worker:
+    image: ${DOCKER_IMAGE}

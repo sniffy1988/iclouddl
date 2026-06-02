@@ -1,0 +1,17 @@
+# Development overrides: mount source code, skip image rebuild for Python changes
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  api:
+    volumes:
+      - ./src:/app/src:ro
+      - downloads:/data/downloads
+      - cookies:/data/cookies
+    environment:
+      RUN_MIGRATIONS: "true"
+
+  worker:
+    volumes:
+      - ./src:/app/src:ro
+      - downloads:/data/downloads
+      - cookies:/data/cookies

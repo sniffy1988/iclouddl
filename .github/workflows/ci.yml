@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -e ".[dev]"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build web UI
+        working-directory: web
+        run: npm ci && npm run build
+
+      - name: Run tests
+        run: pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: iclouddownloader:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test container
+        run: |
+          docker run -d --name icloud-ci -p 18765:8765 \
+            -e DATABASE_URL=sqlite:////data/iclouddownloader.db \
+            -e WEB_ADMIN_PASSWORD=ci-test-password \
+            -e WEB_SESSION_SECRET=ci-test-secret \
+            -e RUN_MIGRATIONS=true \
+            iclouddownloader:ci
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:18765/api/health; then
+              echo "Health OK"
+              docker stop icloud-ci
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs icloud-ci
+          exit 1
