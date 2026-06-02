@@ -30,7 +30,6 @@ class UserService:
         download_dir: str | None = None,
         sync_interval_seconds: int | None = None,
         library_key: str = "root",
-        telegram_notify: bool = True,
     ) -> User:
         settings = get_settings()
         interval = sync_interval_seconds or settings.default_sync_interval_seconds
@@ -40,7 +39,6 @@ class UserService:
             download_dir=download_dir or "",
             sync_interval_seconds=interval,
             library_key=library_key,
-            telegram_notify=telegram_notify,
             next_sync_at=datetime.now(timezone.utc),
         )
         self.db.add(user)

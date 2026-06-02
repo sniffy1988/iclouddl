@@ -8,7 +8,7 @@ Multi-user iCloud Photos backup service with a file-based SQLite database, sched
 - **Download only** — one-way backup; never deletes local files or modifies iCloud
 - **SQLite file database** — all state stored in `./data/iclouddownloader.db` (survives restarts; easy to back up)
 - **Daemon** — polls for users due for sync on a configurable interval (default 6 hours)
-- **Telegram** — sync notifications, 2FA code relay (`/code 123456`), admin ops messages
+- **Telegram** — daemon status to admin chat (user added, sync/count started/finished, etc.) plus optional 2FA bot (`/code 123456`)
 - **Web UI** — manage users, monitor syncs, submit 2FA codes, live SSE event feed
 
 ## Apple account requirements
@@ -36,7 +36,7 @@ Force local mode (no Docker):
 
 Requires **Python 3.12+** and **Node.js** (to build the web UI on first run).
 
-Then open **http://localhost:8765** and log in with `WEB_ADMIN_PASSWORD` from `.env` (default in the example file — change it for production).
+Then open **http://localhost:8765** — on first visit you will **create the admin account** (password stored in the database). Change it later under **Settings → Admin login**.
 
 This starts:
 
@@ -159,10 +159,8 @@ iclouddownloader telegram test
 | `COOKIE_DIR` | Per-user pyicloud session cookies |
 | `DEFAULT_SYNC_INTERVAL_SECONDS` | Default interval (21600 = 6h) |
 | `WEB_PORT` | Web UI and API port (default `8765`) |
-| `WEB_ADMIN_PASSWORD` | Web UI admin password |
-| `TELEGRAM_ENABLED` | Enable Telegram bot |
-| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather |
-| `TELEGRAM_ADMIN_CHAT_ID` | Chat ID for ops notifications |
+| Admin login | Created on first web visit (database only; not `.env`) |
+| Telegram | **Settings** in the web UI only (stored in the database, not `.env`) |
 | `IMMICH_SCAN_DEBOUNCE_SECONDS` | Global min seconds between Immich scans (default 120) |
 
 Immich server URL and API key are configured in **Settings** (with test connection). On each **User** page, link that Apple ID to an Immich external library ID so scans run after sync.

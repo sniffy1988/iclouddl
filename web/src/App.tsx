@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
+import { ToastProvider } from "./components/ToastProvider";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
@@ -22,6 +23,7 @@ function Protected({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
+    <ToastProvider>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route
@@ -41,5 +43,6 @@ export default function App() {
         }
       />
     </Routes>
+    </ToastProvider>
   );
 }

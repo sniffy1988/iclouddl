@@ -18,7 +18,7 @@ fi
 if [ ! -f .env ]; then
   cp .env.docker.example .env
   echo "Created .env from .env.docker.example"
-  echo "  → Set WEB_ADMIN_PASSWORD in .env before production use."
+  echo "  → On first open, create the admin account in the web UI."
 fi
 
 mkdir -p data/downloads data/cookies
@@ -35,7 +35,7 @@ fi
 echo ""
 echo "iCloud Photo Downloader is running (Docker)."
 echo "  Web UI:  http://localhost:${WEB_PORT}"
-echo "  Login:   password from WEB_ADMIN_PASSWORD in .env"
+echo "  Login:   create admin on first visit (stored in database)"
 echo "  Data:    ./data/iclouddownloader.db"
 echo "           ./data/downloads/ (photos)"
 echo "           ./data/cookies/ (iCloud sessions)"

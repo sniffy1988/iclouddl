@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { useToast } from "../components/ToastProvider";
 
 function StatCard({ label, value }: { label: string; value: number | string }) {
   return (
@@ -20,21 +21,17 @@ export default function Dashboard() {
     refetchInterval: 15000,
   });
   const [events, setEvents] = useState<string[]>([]);
-  const [dueFeedback, setDueFeedback] = useState<string | null>(null);
+  const toast = useToast();
 
   const triggerDue = useMutation({
     mutationFn: () => api.triggerDueSyncs(),
     onSuccess: (r) => {
-      setDueFeedback(r.message);
+      toast.success(r.message);
       qc.invalidateQueries({ queryKey: ["stats"] });
       qc.invalidateQueries({ queryKey: ["users"] });
       qc.invalidateQueries({ queryKey: ["sync-runs"] });
-      setTimeout(() => setDueFeedback(null), 5000);
     },
-    onError: (e: Error) => {
-      setDueFeedback(e.message);
-      setTimeout(() => setDueFeedback(null), 5000);
-    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   useEffect(() => {
@@ -73,9 +70,6 @@ export default function Dashboard() {
               ? "Starting…"
               : `Sync all due (${stats.users_due_for_sync})`}
           </button>
-          {dueFeedback && (
-            <span className="text-sm text-green-400">{dueFeedback}</span>
-          )}
         </div>
       </div>
 

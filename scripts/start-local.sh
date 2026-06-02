@@ -51,7 +51,7 @@ fi
 echo ""
 echo "Starting worker (background) and web API (foreground)..."
 echo "  Web UI:  http://localhost:${WEB_PORT}"
-echo "  Login:   WEB_ADMIN_PASSWORD from .env"
+echo "  Login:   create admin on first visit (stored in database)"
 echo "  Data:    ./data/iclouddownloader.db"
 echo "  Stop:    Ctrl+C"
 echo ""

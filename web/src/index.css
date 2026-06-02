@@ -5,3 +5,18 @@
 body {
   @apply bg-slate-950 text-slate-100 min-h-screen;
 }
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toast-enter {
+  animation: toast-in 0.2s ease-out;
+}

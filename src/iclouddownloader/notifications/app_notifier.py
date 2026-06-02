@@ -1,4 +1,4 @@
-"""Telegram alerts + Immich external library scan after sync."""
+"""Daemon status alerts (Telegram) and Immich scans after sync."""
 
 from __future__ import annotations
 
@@ -19,38 +19,45 @@ class AppNotifier:
         self._telegram = TelegramNotifier()
         self._immich = ImmichClient()
 
+    def daemon_started(self) -> None:
+        self._telegram.daemon_started()
+
+    def daemon_stopped(self) -> None:
+        self._telegram.daemon_stopped()
+
+    def user_added(self, user: User) -> None:
+        self._telegram.user_added(user)
+
+    def user_removed(self, user: User) -> None:
+        self._telegram.user_removed(user)
+
+    def sync_queued(self, user: User) -> None:
+        self._telegram.sync_queued(user)
+
     def sync_started(self, user: User) -> None:
         self._telegram.sync_started(user)
 
     def sync_completed(self, user: User, payload: dict) -> None:
         self._telegram.sync_completed(user, payload)
 
+    def sync_failed(self, user: User, error: str) -> None:
+        self._telegram.sync_failed(user, error)
+
+    def count_started(self, user: User) -> None:
+        self._telegram.count_started(user)
+
+    def count_completed(self, user: User, payload: dict) -> None:
+        self._telegram.count_completed(user, payload)
+
+    def count_failed(self, user: User, error: str) -> None:
+        self._telegram.count_failed(user, error)
+
     def immich_after_sync(self, user: User, payload: dict) -> None:
         ok, msg = self._immich.after_sync_completed(user, payload)
         if ok:
             logger.info("[%s] %s", user.apple_id, msg)
-            if self._telegram.enabled and user.telegram_notify:
-                self._telegram.send_sync(f"[{user.apple_id}] Immich: {msg}")
         elif self._immich.should_scan_after_sync(user):
             logger.warning("[%s] Immich scan failed: %s", user.apple_id, msg)
-            if self._telegram.enabled and user.telegram_notify:
-                self._telegram.send_sync(f"[{user.apple_id}] Immich scan failed: {msg}")
-
-    def sync_failed(self, user: User, error: str) -> None:
-        if user.telegram_notify:
-            self._telegram.sync_failed(user, error)
-
-    def sync_progress(self, user: User, payload: dict) -> None:
-        if user.telegram_notify:
-            self._telegram.sync_progress(user, payload)
-
-    def auth_required(self, user: User, challenge_type: str) -> None:
-        if user.telegram_notify:
-            self._telegram.auth_required(user, challenge_type)
-
-    def admin_message(self, text: str) -> None:
-        self._telegram.admin_message(text)
 
     async def test_telegram(self) -> bool:
         return await self._telegram.test_message()
-

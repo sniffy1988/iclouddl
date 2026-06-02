@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api, SettingsData } from "../api/client";
+import { useToast } from "../components/ToastProvider";
 
 const PATH_TEMPLATE_HELP =
   "Use / between folders. Tokens: YYYY, YY, MM, DD, HH, mm, ss, and {filename}. Example: YYYY/MM/DD/{filename}";
 
 export default function Settings() {
+  const toast = useToast();
   const qc = useQueryClient();
   const { data: settings, isLoading } = useQuery({
     queryKey: ["settings"],
@@ -15,7 +17,7 @@ export default function Settings() {
   const [form, setForm] = useState<Partial<SettingsData>>({});
   const [tokenInput, setTokenInput] = useState("");
   const [immichApiKeyInput, setImmichApiKeyInput] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState("");
 
   useEffect(() => {
     if (settings) {
@@ -33,6 +35,7 @@ export default function Settings() {
       });
       setTokenInput("");
       setImmichApiKeyInput("");
+      setAdminPasswordInput("");
     }
   }, [settings]);
 
@@ -42,18 +45,35 @@ export default function Settings() {
         ...form,
         telegram_bot_token: tokenInput || undefined,
         immich_api_key: immichApiKeyInput || undefined,
+        admin_password: adminPasswordInput || undefined,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
       setTokenInput("");
       setImmichApiKeyInput("");
-      setSaved(true);
-      setTimeout(() => setSaved(false), 4000);
+      setAdminPasswordInput("");
+      toast.success("Settings saved");
     },
+    onError: (err: Error) => toast.error(err.message),
   });
 
-  const testTg = useMutation({ mutationFn: api.testTelegram });
-  const testImmich = useMutation({ mutationFn: () => api.testImmich() });
+  const testTg = useMutation({
+    mutationFn: api.testTelegram,
+    onSuccess: (data) => {
+      if (data.ok) toast.success("Test message sent");
+      else toast.error("Failed — check token and chat ID, then Save");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const testImmich = useMutation({
+    mutationFn: () => api.testImmich(),
+    onSuccess: (data) => {
+      if (data.ok) toast.success(data.message);
+      else toast.error(data.message);
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
   if (isLoading || !settings) return <div>Loading...</div>;
 
   const syncHours = (form.default_sync_interval_seconds ?? settings.default_sync_interval_seconds) / 3600;
@@ -62,8 +82,8 @@ export default function Settings() {
     <div className="max-w-3xl">
       <h2 className="text-2xl font-semibold mb-2">Settings</h2>
       <p className="text-slate-500 text-sm mb-8">
-        Saved to the database. Restart the worker after changing Telegram settings so the bot picks
-        up a new token.
+        Telegram and other secrets live in the database (not .env). Restart the worker after
+        changing Telegram so the bot picks up a new token.
       </p>
 
       <form
@@ -73,6 +93,32 @@ export default function Settings() {
           save.mutate();
         }}
       >
+        <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+          <h3 className="text-lg font-medium text-amber-300">Admin login</h3>
+          <p className="text-sm text-slate-500">
+            Web UI password (bcrypt hash in the database). The first admin is created on the
+            login screen when none exists yet.
+          </p>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">New admin password</label>
+            <input
+              type="password"
+              value={adminPasswordInput}
+              onChange={(e) => setAdminPasswordInput(e.target.value)}
+              placeholder={
+                settings.admin_password_set
+                  ? "Leave blank to keep current password"
+                  : "Set admin password"
+              }
+              autoComplete="new-password"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
+            />
+            {settings.admin_password_set && (
+              <p className="text-xs text-slate-500 mt-1">A password is already stored in the database.</p>
+            )}
+          </div>
+        </section>
+
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
           <h3 className="text-lg font-medium text-sky-300">Telegram</h3>
 
@@ -85,7 +131,7 @@ export default function Settings() {
               }
               className="rounded"
             />
-            <span>Enable Telegram notifications and 2FA relay</span>
+            <span>Enable Telegram (daemon status + optional 2FA bot)</span>
           </label>
 
           <div>
@@ -143,13 +189,14 @@ export default function Settings() {
             disabled={testTg.isPending}
             className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm"
           >
-            {testTg.isPending ? "Sending…" : "Test Telegram notification"}
+            {testTg.isPending ? "Sending…" : "Test daemon status message"}
           </button>
-          {testTg.data && (
-            <p className={`text-sm ${testTg.data.ok ? "text-green-400" : "text-red-400"}`}>
-              {testTg.data.ok ? "Test message sent" : "Failed — check token and chat ID, then Save"}
-            </p>
-          )}
+          <p className="text-xs text-slate-500">
+            Admin chat receives daemon events only: user added/removed, sync and photo-count
+            started/finished/failed, daemon start/stop. Immich and auth alerts stay in the web UI
+            and logs. The bot still accepts <span className="font-mono">/code</span> for 2FA when
+            allowed user IDs are set.
+          </p>
         </section>
 
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
@@ -251,11 +298,6 @@ export default function Settings() {
           >
             {testImmich.isPending ? "Connecting…" : "Test Immich connection"}
           </button>
-          {testImmich.data && (
-            <p className={`text-sm ${testImmich.data.ok ? "text-green-400" : "text-red-400"}`}>
-              {testImmich.data.message}
-            </p>
-          )}
         </section>
 
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
@@ -325,10 +367,6 @@ export default function Settings() {
           >
             {save.isPending ? "Saving…" : "Save settings"}
           </button>
-          {saved && <span className="text-green-400 text-sm">Settings saved</span>}
-          {save.isError && (
-            <span className="text-red-400 text-sm">{(save.error as Error).message}</span>
-          )}
         </div>
       </form>
     </div>

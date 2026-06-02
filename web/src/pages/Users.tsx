@@ -8,8 +8,10 @@ import FetchCountButton from "../components/FetchCountButton";
 import StatusPill from "../components/StatusPill";
 import SyncNowButton from "../components/SyncNowButton";
 import { formatSyncInterval } from "../utils/syncSchedule";
+import { useToast } from "../components/ToastProvider";
 
 export default function Users() {
+  const toast = useToast();
   const qc = useQueryClient();
   const hasCounting = (users: User[] | undefined) =>
     users?.some((u) => u.activity_status === "counting") ?? false;
@@ -25,16 +27,22 @@ export default function Users() {
 
   const create = useMutation({
     mutationFn: () => api.createUser({ apple_id: appleId }, fetchOnCreate),
-    onSuccess: () => {
+    onSuccess: (user) => {
       qc.invalidateQueries({ queryKey: ["users"] });
       setShowAdd(false);
       setAppleId("");
+      toast.success(`User ${user.apple_id} added`);
     },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const fetchAll = useMutation({
     mutationFn: () => api.fetchAllPhotoCounts(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+      toast.info(r.message);
+    },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   if (isLoading) return <div>Loading...</div>;

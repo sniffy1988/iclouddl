@@ -120,9 +120,6 @@ class AuthService:
         self.mark_needs_auth(user)
         self.db.commit()
 
-    def notify_reauth_needed(self, user: User, challenge_type: str, notifier) -> None:
-        notifier.auth_required(user, challenge_type)
-
     def create_challenge(
         self,
         user: User,

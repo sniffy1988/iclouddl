@@ -36,7 +36,6 @@ export interface User {
   sync_interval_seconds: number;
   enabled: boolean;
   library_key: string;
-  telegram_notify: boolean;
   next_sync_at: string | null;
   last_sync_at: string | null;
   last_sync_status: string | null;
@@ -125,6 +124,7 @@ export interface SettingsData {
   immich_api_key_set: boolean;
   immich_api_key_masked: string;
   immich_scan_debounce_seconds: number;
+  admin_password_set: boolean;
 }
 
 export interface DashboardStats {
@@ -138,6 +138,13 @@ export interface DashboardStats {
 }
 
 export const api = {
+  authStatus: () =>
+    request<{ needs_setup: boolean; authenticated: boolean }>("/auth/status"),
+  setupAdmin: (password: string) =>
+    request<{ ok: boolean }>("/auth/setup", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    }),
   login: (password: string) =>
     request<{ ok: boolean }>("/auth/login", {
       method: "POST",
@@ -200,7 +207,11 @@ export const api = {
   stats: () => request<DashboardStats>("/dashboard/stats"),
   settings: () => request<SettingsData>("/settings"),
   updateSettings: (
-    data: Partial<SettingsData> & { telegram_bot_token?: string; immich_api_key?: string }
+    data: Partial<SettingsData> & {
+      telegram_bot_token?: string;
+      immich_api_key?: string;
+      admin_password?: string;
+    }
   ) => request<SettingsData>("/settings", { method: "PATCH", body: JSON.stringify(data) }),
   testTelegram: () => request<{ ok: boolean }>("/telegram/test", { method: "POST" }),
   testImmich: (libraryId?: string) =>

@@ -62,7 +62,6 @@ class User(Base):
     sync_interval_seconds: Mapped[int] = mapped_column(Integer, default=21600)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     library_key: Mapped[str] = mapped_column(String(255), default="root")
-    telegram_notify: Mapped[bool] = mapped_column(Boolean, default=True)
     next_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_sync_status: Mapped[str | None] = mapped_column(String(64))
@@ -194,6 +193,7 @@ class RuntimeSettings(Base):
     immich_base_url: Mapped[str] = mapped_column(String(512), default="")
     immich_api_key: Mapped[str] = mapped_column(String(512), default="")
     immich_scan_debounce_seconds: Mapped[int] = mapped_column(Integer, default=120)
+    admin_password_hash: Mapped[str] = mapped_column(String(256), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 

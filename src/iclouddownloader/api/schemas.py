@@ -9,13 +9,21 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class SetupAdminRequest(BaseModel):
+    password: str = Field(min_length=8, max_length=128)
+
+
+class AuthStatusResponse(BaseModel):
+    needs_setup: bool
+    authenticated: bool = False
+
+
 class UserCreate(BaseModel):
     apple_id: str
     display_name: str | None = None
     download_dir: str | None = None
     sync_interval_seconds: int | None = None
     library_key: str = "root"
-    telegram_notify: bool = True
 
 
 class UserUpdate(BaseModel):
@@ -24,7 +32,6 @@ class UserUpdate(BaseModel):
     sync_interval_seconds: int | None = Field(default=None, ge=300, le=2_592_000)
     enabled: bool | None = None
     library_key: str | None = None
-    telegram_notify: bool | None = None
     immich_library_id: str | None = None
     immich_scan_after_sync: bool | None = None
     reschedule_sync: bool | None = None
@@ -38,7 +45,6 @@ class UserResponse(BaseModel):
     sync_interval_seconds: int
     enabled: bool
     library_key: str
-    telegram_notify: bool
     next_sync_at: datetime | None
     last_sync_at: datetime | None
     last_sync_status: str | None
@@ -173,6 +179,7 @@ class SettingsResponse(BaseModel):
     immich_api_key_set: bool = False
     immich_api_key_masked: str = ""
     immich_scan_debounce_seconds: int = 120
+    admin_password_set: bool = False
 
 
 class ImmichTestRequest(BaseModel):
@@ -192,3 +199,4 @@ class SettingsUpdate(BaseModel):
     immich_base_url: str | None = None
     immich_api_key: str | None = None
     immich_scan_debounce_seconds: int | None = Field(default=None, ge=0, le=3600)
+    admin_password: str | None = None

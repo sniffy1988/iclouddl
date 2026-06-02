@@ -44,6 +44,8 @@ def create_user(
     if svc.get_by_apple_id(body.apple_id):
         raise HTTPException(400, "Apple ID already registered")
     user = svc.create_user(**body.model_dump())
+    notifier = AppNotifier()
+    notifier.user_added(user)
 
     if fetch_count:
 
@@ -52,7 +54,7 @@ def create_user(
 
             sdb = get_session_factory()()
             try:
-                SyncService(sdb).fetch_icloud_photo_count(uid)
+                SyncService(sdb, notifier=notifier).fetch_icloud_photo_count(uid)
             except Exception:
                 pass
             finally:
@@ -156,7 +158,12 @@ async def test_user_immich(
 
 @router.delete("/{user_id}", status_code=204)
 def delete_user(user_id: int, db: Session = Depends(get_db), _: None = Depends(require_auth)):
-    UserService(db).delete_user(user_id)
+    svc = UserService(db)
+    user = svc.get_user(user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    AppNotifier().user_removed(user)
+    svc.delete_user(user_id)
 
 
 @router.get("/{user_id}/photo-counts", response_model=PhotoCountResponse)
@@ -199,12 +206,14 @@ def fetch_photo_count(
             already_running=True,
         )
 
+    notifier = AppNotifier()
+
     def _run():
         from iclouddownloader.db.session import get_session_factory
 
         sdb = get_session_factory()()
         try:
-            SyncService(sdb).fetch_icloud_photo_count(user_id)
+            SyncService(sdb, notifier=notifier).fetch_icloud_photo_count(user_id)
         finally:
             sdb.close()
 

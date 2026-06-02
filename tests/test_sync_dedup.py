@@ -15,7 +15,7 @@ def test_asset_id_from_photo():
 
 def test_photo_skip_when_downloaded(db_session, tmp_path):
     user = User(
-        apple_id="test@icloud.com",
+        apple_id="dedup-test@icloud.com",
         download_dir=str(tmp_path),
         sync_interval_seconds=3600,
     )

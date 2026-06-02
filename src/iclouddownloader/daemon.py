@@ -8,7 +8,7 @@ import time
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from iclouddownloader.config import get_settings
+from iclouddownloader.services.runtime_settings_service import get_effective_settings
 from iclouddownloader.db.session import get_session_factory
 from iclouddownloader.services.auth_service import AuthService
 from iclouddownloader.services.sync_service import SyncService
@@ -63,7 +63,7 @@ def run_daemon() -> None:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
-    settings = get_settings()
+    settings = get_effective_settings()
     notifier = AppNotifier()
 
     signal.signal(signal.SIGTERM, _handle_signal)
@@ -72,7 +72,7 @@ def run_daemon() -> None:
     if settings.telegram_enabled:
         tg_thread = threading.Thread(target=run_telegram_bot, daemon=True)
         tg_thread.start()
-        notifier.admin_message("Daemon started")
+        notifier.daemon_started()
 
     scheduler = BackgroundScheduler()
     scheduler.add_job(
@@ -90,6 +90,8 @@ def run_daemon() -> None:
             time.sleep(1)
     finally:
         scheduler.shutdown(wait=False)
+        if settings.telegram_enabled:
+            notifier.daemon_stopped()
         logger.info("Daemon stopped")
 
 

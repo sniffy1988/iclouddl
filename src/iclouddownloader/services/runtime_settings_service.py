@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
+from functools import lru_cache
+
 from sqlalchemy.orm import Session
 
-from iclouddownloader.config import Settings, get_settings
+from iclouddownloader.admin_auth import set_admin_password
+from iclouddownloader.config import EffectiveSettings, get_settings
 from iclouddownloader.db.models import RuntimeSettings
 from iclouddownloader.path_template import validate_path_template
 
@@ -13,6 +17,25 @@ def _mask_token(token: str) -> str:
     if len(token) <= 8:
         return "••••••••"
     return "••••••••" + token[-4:]
+
+
+def _import_legacy_telegram_from_env(row: RuntimeSettings) -> bool:
+    """One-time migration for installs that still have TELEGRAM_* in the process environment."""
+    if row.telegram_bot_token.strip():
+        return False
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    if not token:
+        return False
+    row.telegram_bot_token = token
+    chat = os.getenv("TELEGRAM_ADMIN_CHAT_ID", "").strip()
+    if chat:
+        row.telegram_admin_chat_id = chat
+    allowed = os.getenv("TELEGRAM_ALLOWED_USER_IDS", "").strip()
+    if allowed:
+        row.telegram_allowed_user_ids = allowed
+    enabled_raw = os.getenv("TELEGRAM_ENABLED", "").strip().lower()
+    row.telegram_enabled = enabled_raw in ("1", "true", "yes") or bool(token)
+    return True
 
 
 class RuntimeSettingsService:
@@ -26,10 +49,10 @@ class RuntimeSettingsService:
         env = get_settings()
         row = RuntimeSettings(
             id=1,
-            telegram_enabled=env.telegram_enabled,
-            telegram_bot_token=env.telegram_bot_token,
-            telegram_admin_chat_id=env.telegram_admin_chat_id,
-            telegram_allowed_user_ids=env.telegram_allowed_user_ids,
+            telegram_enabled=False,
+            telegram_bot_token="",
+            telegram_admin_chat_id="",
+            telegram_allowed_user_ids="",
             download_path_template=env.download_path_template,
             default_sync_interval_seconds=env.default_sync_interval_seconds,
             max_concurrent_downloads=env.max_concurrent_downloads,
@@ -42,10 +65,27 @@ class RuntimeSettingsService:
         self.db.add(row)
         self.db.commit()
         self.db.refresh(row)
+        if _import_legacy_telegram_from_env(row):
+            self.db.commit()
+            self.db.refresh(row)
         return row
 
+    def _backfill_immich_from_env(self, row: RuntimeSettings) -> None:
+        if row.immich_api_key.strip():
+            return
+        key = os.getenv("IMMICH_API_KEY", "").strip()
+        if key:
+            row.immich_api_key = key
+            self.db.commit()
+            self.db.refresh(row)
+
     def get_row(self) -> RuntimeSettings:
-        return self._get_or_create_row()
+        row = self._get_or_create_row()
+        if _import_legacy_telegram_from_env(row):
+            self.db.commit()
+            self.db.refresh(row)
+        self._backfill_immich_from_env(row)
+        return row
 
     def to_api_dict(self) -> dict:
         row = self.get_row()
@@ -67,6 +107,7 @@ class RuntimeSettingsService:
             "immich_api_key_set": bool(row.immich_api_key),
             "immich_api_key_masked": _mask_token(row.immich_api_key),
             "immich_scan_debounce_seconds": row.immich_scan_debounce_seconds,
+            "admin_password_set": bool(row.admin_password_hash),
         }
 
     def update(self, data: dict) -> RuntimeSettings:
@@ -100,6 +141,10 @@ class RuntimeSettingsService:
                 row.immich_api_key = token
         if "immich_scan_debounce_seconds" in data and data["immich_scan_debounce_seconds"] is not None:
             row.immich_scan_debounce_seconds = max(int(data["immich_scan_debounce_seconds"]), 0)
+        if data.get("admin_password"):
+            pwd = str(data["admin_password"]).strip()
+            if pwd and not pwd.startswith("••••"):
+                set_admin_password(self.db, row, pwd)
 
         self.db.commit()
         self.db.refresh(row)
@@ -107,13 +152,13 @@ class RuntimeSettingsService:
         return row
 
 
-def get_effective_settings_from_row(row: RuntimeSettings | None) -> Settings:
+def get_effective_settings_from_row(row: RuntimeSettings | None) -> EffectiveSettings:
     env = get_settings()
+    merged = env.model_dump()
     if not row:
-        return env
-    return Settings(
-        **{
-            **env.model_dump(),
+        return EffectiveSettings(**merged)
+    merged.update(
+        {
             "telegram_enabled": row.telegram_enabled,
             "telegram_bot_token": row.telegram_bot_token,
             "telegram_admin_chat_id": row.telegram_admin_chat_id,
@@ -128,13 +173,11 @@ def get_effective_settings_from_row(row: RuntimeSettings | None) -> Settings:
             "immich_scan_debounce_seconds": row.immich_scan_debounce_seconds,
         }
     )
-
-
-from functools import lru_cache
+    return EffectiveSettings(**merged)
 
 
 @lru_cache
-def get_effective_settings() -> Settings:
+def get_effective_settings() -> EffectiveSettings:
     from iclouddownloader.db.session import get_session_factory
 
     db = get_session_factory()()

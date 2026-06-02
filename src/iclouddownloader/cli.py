@@ -60,6 +60,7 @@ def user_add(apple_id, display_name, download_dir, sync_interval_seconds):
             download_dir=download_dir,
             sync_interval_seconds=sync_interval_seconds,
         )
+        AppNotifier().user_added(u)
         click.echo(f"Created user id={u.id} apple_id={u.apple_id} dir={u.download_dir}")
     finally:
         db.close()
@@ -95,7 +96,7 @@ def user_fetch_count(user_id):
     """Count photos in iCloud without downloading."""
     db = get_session_factory()()
     try:
-        result = SyncService(db).fetch_icloud_photo_count(user_id)
+        result = SyncService(db, notifier=AppNotifier()).fetch_icloud_photo_count(user_id)
         click.echo(
             f"iCloud photos: {result['icloud_photos_count']} | "
             f"downloaded locally: {result['downloaded_count']} | "
@@ -206,8 +207,8 @@ def telegram_test():
     import asyncio
 
     notifier = AppNotifier()
-    ok = asyncio.run(notifier.test_message())
-    click.echo("Sent" if ok else "Failed (check TELEGRAM_* env vars)")
+    ok = asyncio.run(notifier.test_telegram())
+    click.echo("Sent" if ok else "Failed — configure Telegram in Settings (database)")
 
 
 if __name__ == "__main__":

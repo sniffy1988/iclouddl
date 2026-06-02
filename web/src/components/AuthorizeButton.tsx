@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api/client";
+import { useToast } from "./ToastProvider";
 
 type Props = {
   userId: number;
@@ -23,11 +24,11 @@ export default function AuthorizeButton({
     return null;
   }
   const qc = useQueryClient();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>("password");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [deliveryHint, setDeliveryHint] = useState<string | null>(null);
 
   const { data: challenge } = useQuery({
@@ -42,7 +43,6 @@ export default function AuthorizeButton({
     setStep("password");
     setPassword("");
     setCode("");
-    setError(null);
     setDeliveryHint(null);
   };
 
@@ -51,16 +51,15 @@ export default function AuthorizeButton({
     setStep("password");
     setPassword("");
     setCode("");
-    setError(null);
     setDeliveryHint(null);
   };
 
   const login = useMutation({
     mutationFn: () => api.startICloudAuth(userId, password),
     onSuccess: (result) => {
-      setError(null);
       if (result.status === "authenticated") {
         closeModal();
+        toast.success("iCloud authorized");
         qc.invalidateQueries({ queryKey: ["users"] });
         qc.invalidateQueries({ queryKey: ["user", userId] });
       } else {
@@ -73,14 +72,14 @@ export default function AuthorizeButton({
         qc.invalidateQueries({ queryKey: ["users"] });
       }
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const submit2fa = useMutation({
     mutationFn: () => api.submit2FA(userId, code.trim(), challenge?.id, password),
     onSuccess: () => {
-      setError(null);
       closeModal();
+      toast.success("iCloud authorized");
       qc.invalidateQueries({ queryKey: ["users"] });
       qc.invalidateQueries({ queryKey: ["user", userId] });
       qc.invalidateQueries({ queryKey: ["challenge", userId] });
@@ -93,9 +92,9 @@ export default function AuthorizeButton({
         msg.includes("No pending auth challenge")
       ) {
         setStep("password");
-        setError("Session expired — enter your password and sign in again.");
+        toast.warning("Session expired — enter your password and sign in again.");
       } else {
-        setError(msg);
+        toast.error(msg);
       }
     },
   });
@@ -195,7 +194,6 @@ export default function AuthorizeButton({
                   onClick={() => {
                     setStep("password");
                     setCode("");
-                    setError(null);
                   }}
                   className="text-slate-500 text-xs hover:text-slate-300"
                 >
@@ -203,8 +201,6 @@ export default function AuthorizeButton({
                 </button>
               </div>
             )}
-
-            {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
 
             <button
               type="button"

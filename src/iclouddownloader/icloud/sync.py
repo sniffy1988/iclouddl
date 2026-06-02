@@ -90,10 +90,10 @@ class PhotoSyncEngine:
                     immich_notify(user, payload)
                 except Exception:
                     logger.exception("Immich notify failed")
-        if self.notifier and user.telegram_notify:
-            self._notify_telegram(event_type, user, payload)
+        if self.notifier:
+            self._notify_daemon_status(event_type, user, payload)
 
-    def _notify_telegram(self, event_type: str, user: User, payload: dict):
+    def _notify_daemon_status(self, event_type: str, user: User, payload: dict):
         if not self.notifier:
             return
         try:
@@ -103,10 +103,8 @@ class PhotoSyncEngine:
                 self.notifier.sync_completed(user, payload)
             elif event_type == "sync.failed":
                 self.notifier.sync_failed(user, payload.get("error", "unknown"))
-            elif event_type == "sync.progress":
-                self.notifier.sync_progress(user, payload)
         except Exception:
-            logger.exception("Telegram notify failed")
+            logger.exception("Daemon status notify failed")
 
     def _photo_exists(self, user_id: int, asset_id: str) -> Photo | None:
         return self.db.scalar(
@@ -235,8 +233,6 @@ class PhotoSyncEngine:
             sync_run.finished_at = datetime.now(timezone.utc)
             self.db.commit()
             self._publish("sync.failed", user, sync_run, error="auth_required")
-            if self.notifier and user.telegram_notify:
-                auth_svc.notify_reauth_needed(user, exc.challenge_type.value, self.notifier)
             return sync_run
 
         except Exception as e:

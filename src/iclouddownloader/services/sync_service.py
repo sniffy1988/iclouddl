@@ -51,6 +51,8 @@ class SyncService:
         user.last_sync_status = "queued"
         self.db.commit()
         self.db.refresh(user)
+        if self.notifier:
+            self.notifier.sync_queued(user)
         return user
 
     def get_local_photo_stats(self, user_id: int) -> dict[str, int]:
@@ -106,7 +108,6 @@ class SyncService:
             "sync_interval_seconds": user.sync_interval_seconds,
             "enabled": user.enabled,
             "library_key": user.library_key,
-            "telegram_notify": user.telegram_notify,
             "next_sync_at": user.next_sync_at,
             "last_sync_at": user.last_sync_at,
             "last_sync_status": user.last_sync_status,
@@ -152,6 +153,8 @@ class SyncService:
         get_event_bus().publish(
             SyncEvent(type="count.started", user_id=user.id, apple_id=user.apple_id)
         )
+        if self.notifier:
+            self.notifier.count_started(user)
         user.last_sync_status = "counting"
         user.icloud_photos_count = 0
         self.db.commit()
@@ -190,6 +193,8 @@ class SyncService:
                     payload=result,
                 )
             )
+            if self.notifier:
+                self.notifier.count_completed(user, result)
             return result
 
         except AuthRequired:
@@ -204,6 +209,8 @@ class SyncService:
                     payload={"error": "auth_required"},
                 )
             )
+            if self.notifier:
+                self.notifier.count_failed(user, "auth_required")
             raise
 
         except Exception as e:
@@ -217,6 +224,8 @@ class SyncService:
                     payload={"error": str(e)},
                 )
             )
+            if self.notifier:
+                self.notifier.count_failed(user, str(e))
             raise
 
     def trigger_sync(self, user_id: int, password: str | None = None) -> SyncRun:

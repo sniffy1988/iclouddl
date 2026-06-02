@@ -22,7 +22,7 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "python-multipart",
-    "passlib[bcrypt]",
+    "bcrypt",
     "sse-starlette",
 ]
 

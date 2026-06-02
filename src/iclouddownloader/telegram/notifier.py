@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 class TelegramNotifier:
+    """Admin-channel messages for daemon / worker operational status only."""
+
     def __init__(self):
         self.settings = get_effective_settings()
 
@@ -38,7 +40,7 @@ class TelegramNotifier:
             )
             return resp.is_success
 
-    def send_sync(self, text: str) -> None:
+    def send_status(self, text: str) -> None:
         if not self.enabled:
             return
         try:
@@ -48,31 +50,46 @@ class TelegramNotifier:
         except Exception:
             logger.exception("Failed to send Telegram message")
 
+    def daemon_started(self) -> None:
+        self.send_status("Daemon started")
+
+    def daemon_stopped(self) -> None:
+        self.send_status("Daemon stopped")
+
+    def user_added(self, user: User) -> None:
+        self.send_status(f"User added: {user.apple_id} (id={user.id})")
+
+    def user_removed(self, user: User) -> None:
+        self.send_status(f"User removed: {user.apple_id} (id={user.id})")
+
+    def sync_queued(self, user: User) -> None:
+        self.send_status(f"[{user.apple_id}] Sync queued")
+
     def sync_started(self, user: User) -> None:
-        self.send_sync(f"[{user.apple_id}] Sync started")
+        self.send_status(f"[{user.apple_id}] Sync started")
 
     def sync_completed(self, user: User, payload: dict) -> None:
-        self.send_sync(
-            f"[{user.apple_id}] Sync complete: "
+        self.send_status(
+            f"[{user.apple_id}] Sync finished: "
             f"{payload.get('downloaded', 0)} new, "
             f"{payload.get('failed', 0)} failed, "
             f"{payload.get('skipped', 0)} skipped"
         )
 
     def sync_failed(self, user: User, error: str) -> None:
-        self.send_sync(f"[{user.apple_id}] Sync failed: {error}")
+        self.send_status(f"[{user.apple_id}] Sync failed: {error}")
 
-    def sync_progress(self, user: User, payload: dict) -> None:
-        pass  # avoid spam; only log significant events
+    def count_started(self, user: User) -> None:
+        self.send_status(f"[{user.apple_id}] Photo count started")
 
-    def auth_required(self, user: User, challenge_type: str) -> None:
-        self.send_sync(
-            f"[{user.apple_id}] Enter Apple verification code (expires in 5 min).\n"
-            f"Reply with: /code 123456"
+    def count_completed(self, user: User, payload: dict) -> None:
+        total = payload.get("icloud_photos_count")
+        self.send_status(
+            f"[{user.apple_id}] Photo count finished: {total if total is not None else '?'} photos"
         )
 
-    def admin_message(self, text: str) -> None:
-        self.send_sync(text)
+    def count_failed(self, user: User, error: str) -> None:
+        self.send_status(f"[{user.apple_id}] Photo count failed: {error}")
 
     async def test_message(self) -> bool:
-        return await self._send("iCloud Photo Downloader: test message OK")
+        return await self._send("iCloud Photo Downloader: daemon status test OK")

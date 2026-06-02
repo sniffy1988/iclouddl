@@ -58,7 +58,6 @@ jobs:
         run: |
           docker run -d --name icloud-ci -p 18765:8765 \
             -e DATABASE_URL=sqlite:////data/iclouddownloader.db \
-            -e WEB_ADMIN_PASSWORD=ci-test-password \
             -e WEB_SESSION_SECRET=ci-test-secret \
             -e RUN_MIGRATIONS=true \
             iclouddownloader:ci

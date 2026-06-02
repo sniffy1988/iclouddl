@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
+import { useToast } from "../components/ToastProvider";
 import AuthorizeButton from "../components/AuthorizeButton";
 import { format2faDaysLeft } from "../utils/format2fa";
 import StatusPill from "../components/StatusPill";
@@ -75,11 +76,8 @@ export default function UserDetail() {
   const [intervalPreset, setIntervalPreset] = useState("21600");
   const [customHours, setCustomHours] = useState("6");
   const [scheduledEnabled, setScheduledEnabled] = useState(true);
-  const [telegramNotify, setTelegramNotify] = useState(true);
   const [immichLibraryId, setImmichLibraryId] = useState("");
   const [immichScanAfterSync, setImmichScanAfterSync] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveOk, setSaveOk] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -88,13 +86,19 @@ export default function UserDetail() {
     setIntervalPreset(presetForSeconds(user.sync_interval_seconds));
     setCustomHours(String(secondsToHours(user.sync_interval_seconds)));
     setScheduledEnabled(user.enabled);
-    setTelegramNotify(user.telegram_notify);
     setImmichLibraryId(user.immich_library_id ?? "");
     setImmichScanAfterSync(user.immich_scan_after_sync);
   }, [user]);
 
+  const toast = useToast();
+
   const testImmich = useMutation({
     mutationFn: () => api.testUserImmich(userId),
+    onSuccess: (data) => {
+      if (data.ok) toast.success(data.message);
+      else toast.error(data.message);
+    },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const immichLibraries = useQuery({
@@ -115,23 +119,17 @@ export default function UserDetail() {
         download_dir: downloadDir.trim(),
         sync_interval_seconds: seconds,
         enabled: scheduledEnabled,
-        telegram_notify: telegramNotify,
         immich_library_id: immichScanAfterSync ? immichLibraryId.trim() || null : null,
         immich_scan_after_sync: immichScanAfterSync,
         reschedule_sync: opts?.reschedule_sync,
       });
     },
     onSuccess: () => {
-      setSaveError(null);
-      setSaveOk(true);
-      setTimeout(() => setSaveOk(false), 3000);
+      toast.success("User settings saved");
       qc.invalidateQueries({ queryKey: ["user", userId] });
       qc.invalidateQueries({ queryKey: ["users"] });
     },
-    onError: (err: Error) => {
-      setSaveOk(false);
-      setSaveError(err.message);
-    },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   if (!user) return <div>Loading...</div>;
@@ -316,15 +314,6 @@ export default function UserDetail() {
                 Absolute path on the server where this user&apos;s files are stored.
               </p>
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={telegramNotify}
-                onChange={(e) => setTelegramNotify(e.target.checked)}
-                className="rounded"
-              />
-              Telegram notifications for this user
-            </label>
           </div>
         </Section>
 
@@ -391,11 +380,6 @@ export default function UserDetail() {
               >
                 {testImmich.isPending ? "Calling Immich…" : "Test library scan"}
               </button>
-              {testImmich.data && (
-                <p className={`text-sm ${testImmich.data.ok ? "text-emerald-400" : "text-red-400"}`}>
-                  {testImmich.data.message}
-                </p>
-              )}
             </div>
           )}
         </Section>
@@ -434,8 +418,6 @@ export default function UserDetail() {
           >
             Reset next sync time
           </button>
-          {saveOk && <span className="text-emerald-400 text-sm">Saved</span>}
-          {saveError && <span className="text-red-400 text-sm">{saveError}</span>}
         </div>
       </div>
 

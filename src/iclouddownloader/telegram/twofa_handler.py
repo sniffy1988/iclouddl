@@ -5,7 +5,7 @@ import re
 
 from sqlalchemy.orm import Session
 
-from iclouddownloader.config import get_settings
+from iclouddownloader.services.runtime_settings_service import get_effective_settings
 from iclouddownloader.db.models import AuthChallenge, AuthChallengeStatus
 from iclouddownloader.services.auth_service import AuthService
 
@@ -18,7 +18,7 @@ class TwoFAHandler:
     def __init__(self, db: Session):
         self.db = db
         self.auth_service = AuthService(db)
-        self.settings = get_settings()
+        self.settings = get_effective_settings()
 
     def is_allowed_chat(self, chat_id: int, user_id: int | None = None) -> bool:
         admin = self.settings.telegram_admin_chat_id

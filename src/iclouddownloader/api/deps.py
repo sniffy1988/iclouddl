@@ -14,9 +14,17 @@ from iclouddownloader.db.session import get_db  # noqa: F401 — re-exported for
 SESSION_COOKIE = "icd_session"
 
 
-def verify_admin_password(password: str) -> bool:
-    settings = get_settings()
-    return password == settings.web_admin_password
+def session_valid(db: Session, token: str | None) -> bool:
+    if not token:
+        return False
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    session = db.scalar(
+        select(AdminSession).where(
+            AdminSession.token_hash == token_hash,
+            AdminSession.expires_at > datetime.now(timezone.utc),
+        )
+    )
+    return session is not None
 
 
 def create_session(db: Session) -> str:
@@ -42,14 +50,5 @@ def require_auth(
     db: Session = Depends(get_db),
     token: str | None = Depends(get_session_token),
 ) -> None:
-    if not token:
+    if not session_valid(db, token):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
-    session = db.scalar(
-        select(AdminSession).where(
-            AdminSession.token_hash == token_hash,
-            AdminSession.expires_at > datetime.now(timezone.utc),
-        )
-    )
-    if not session:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired session")
