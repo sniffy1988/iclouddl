@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { useToast } from "./ToastProvider";
 
@@ -20,6 +21,7 @@ export default function AuthorizeButton({
   icloudNeedsAuth = true,
   size = "md",
 }: Props) {
+  const { t } = useTranslation();
   if (icloudAuthorized && !icloudNeedsAuth) {
     return null;
   }
@@ -59,7 +61,7 @@ export default function AuthorizeButton({
     onSuccess: (result) => {
       if (result.status === "authenticated") {
         closeModal();
-        toast.success("iCloud authorized");
+        toast.success(t("authorize.icloudAuthorized"));
         qc.invalidateQueries({ queryKey: ["users"] });
         qc.invalidateQueries({ queryKey: ["user", userId] });
       } else {
@@ -79,7 +81,7 @@ export default function AuthorizeButton({
     mutationFn: () => api.submit2FA(userId, code.trim(), challenge?.id, password),
     onSuccess: () => {
       closeModal();
-      toast.success("iCloud authorized");
+      toast.success(t("authorize.icloudAuthorized"));
       qc.invalidateQueries({ queryKey: ["users"] });
       qc.invalidateQueries({ queryKey: ["user", userId] });
       qc.invalidateQueries({ queryKey: ["challenge", userId] });
@@ -92,7 +94,7 @@ export default function AuthorizeButton({
         msg.includes("No pending auth challenge")
       ) {
         setStep("password");
-        toast.warning("Session expired — enter your password and sign in again.");
+        toast.warning(t("authorize.sessionExpired"));
       } else {
         toast.error(msg);
       }
@@ -105,14 +107,14 @@ export default function AuthorizeButton({
       <button
         type="button"
         onClick={openModal}
-        title="Sign in to iCloud with Apple ID password"
+        title={t("authorize.authorizeTitle")}
         className={`rounded-lg font-medium disabled:opacity-50 ${pad} ${
           icloudNeedsAuth
             ? "bg-amber-600 hover:bg-amber-500"
             : "bg-emerald-700 hover:bg-emerald-600"
         }`}
       >
-        Authorize
+        {t("buttons.authorize")}
       </button>
 
       {open && (
@@ -124,20 +126,14 @@ export default function AuthorizeButton({
             className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold mb-1">Authorize iCloud</h3>
+            <h3 className="text-lg font-semibold mb-1">{t("authorize.title")}</h3>
             <p className="text-slate-500 text-sm mb-4 break-all">{appleId}</p>
 
             {step === "password" && (
               <div className="space-y-3 mb-4">
-                <p className="text-slate-400 text-sm">
-                  Step 1 — enter your Apple ID password (not an app-specific password unless you use
-                  one for iCloud). If 2FA is enabled, you will be asked for a code next.
-                </p>
-                <p className="text-slate-500 text-xs">
-                  Requires “Access iCloud Data on the Web” on the device and Advanced Data
-                  Protection turned off. See user page for details.
-                </p>
-                <label className="block text-sm text-slate-400">Apple ID password</label>
+                <p className="text-slate-400 text-sm">{t("authorize.step1")}</p>
+                <p className="text-slate-500 text-xs">{t("authorize.requirements")}</p>
+                <label className="block text-sm text-slate-400">{t("authorize.applePassword")}</label>
                 <input
                   type="password"
                   value={password}
@@ -148,7 +144,7 @@ export default function AuthorizeButton({
                   autoComplete="current-password"
                   autoFocus
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
-                  placeholder="Password"
+                  placeholder={t("authorize.passwordPlaceholder")}
                 />
                 <button
                   type="button"
@@ -156,25 +152,18 @@ export default function AuthorizeButton({
                   disabled={!password || login.isPending}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 py-2 rounded-lg text-sm font-medium"
                 >
-                  {login.isPending ? "Signing in…" : "Sign in"}
+                  {login.isPending ? t("common.signingIn") : t("authorize.signIn")}
                 </button>
               </div>
             )}
 
             {step === "2fa" && (
               <div className="space-y-3 mb-4">
-                <p className="text-amber-300 text-sm">
-                  Step 2 — enter the 6-digit code. You only need one code (from the Mac/iPhone
-                  popup or SMS — they are usually the same).
-                </p>
+                <p className="text-amber-300 text-sm">{t("authorize.step2")}</p>
                 {deliveryHint && (
                   <p className="text-slate-400 text-xs">{deliveryHint}</p>
                 )}
-                <p className="text-slate-500 text-xs">
-                  Do not click Sign in again — that sends another code. Or send{" "}
-                  <span className="font-mono">/code 123456</span> to your Telegram bot if allowed in
-                  Settings.
-                </p>
+                <p className="text-slate-500 text-xs">{t("authorize.telegramHint")}</p>
                 <input
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
@@ -182,7 +171,7 @@ export default function AuthorizeButton({
                     if (e.key === "Enter" && code.length >= 4 && !submit2fa.isPending)
                       submit2fa.mutate();
                   }}
-                  placeholder="123456"
+                  placeholder={t("authorize.codePlaceholder")}
                   autoFocus
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 tracking-widest"
                   maxLength={8}
@@ -193,7 +182,7 @@ export default function AuthorizeButton({
                   disabled={code.length < 4 || submit2fa.isPending}
                   className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 py-2 rounded-lg text-sm font-medium"
                 >
-                  {submit2fa.isPending ? "Verifying…" : "Verify code"}
+                  {submit2fa.isPending ? t("common.verifying") : t("authorize.verifyCode")}
                 </button>
                 <button
                   type="button"
@@ -203,7 +192,7 @@ export default function AuthorizeButton({
                   }}
                   className="text-slate-500 text-xs hover:text-slate-300"
                 >
-                  ← Back to password
+                  {t("authorize.backToPassword")}
                 </button>
               </div>
             )}
@@ -213,7 +202,7 @@ export default function AuthorizeButton({
               onClick={closeModal}
               className="text-slate-500 text-sm hover:text-slate-300"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
           </div>
         </div>

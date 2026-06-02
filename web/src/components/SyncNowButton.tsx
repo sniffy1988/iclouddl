@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api, PhotoSource, TriggerSyncResult } from "../api/client";
 import { useToast } from "./ToastProvider";
 
@@ -19,6 +20,7 @@ export default function SyncNowButton({
   size = "md",
   onTriggered,
 }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const toast = useToast();
 
@@ -31,9 +33,9 @@ export default function SyncNowButton({
       qc.invalidateQueries({ queryKey: ["sync-runs"] });
       qc.invalidateQueries({ queryKey: ["stats"] });
       if (result.already_running) {
-        toast.warning(result.message || "Sync already in progress");
+        toast.warning(result.message || t("buttons.syncAlreadyRunning"));
       } else if (result.ok) {
-        toast.success(result.message || "Sync started");
+        toast.success(result.message || t("buttons.syncStarted"));
       } else {
         toast.warning(result.message);
       }
@@ -43,7 +45,12 @@ export default function SyncNowButton({
 
   const pad = size === "sm" ? "px-2 py-1 text-xs" : "px-4 py-2 text-sm";
   const text =
-    label ?? (source === "icloud" ? "Sync iCloud" : source === "google_photos" ? "Sync Google" : "Sync all");
+    label ??
+    (source === "icloud"
+      ? t("buttons.syncIcloud")
+      : source === "google_photos"
+        ? t("buttons.syncGoogle")
+        : t("buttons.syncAll"));
 
   return (
     <button
@@ -53,7 +60,7 @@ export default function SyncNowButton({
       title={text}
       className={`bg-sky-600 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium ${pad}`}
     >
-      {sync.isPending ? "Starting…" : text}
+      {sync.isPending ? t("common.starting") : text}
     </button>
   );
 }

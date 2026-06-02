@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import { ToastProvider } from "./components/ToastProvider";
@@ -11,12 +12,13 @@ import Users from "./pages/Users";
 import { api } from "./api/client";
 
 function Protected({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const { isLoading, isError } = useQuery({
     queryKey: ["me"],
     queryFn: api.me,
     retry: false,
   });
-  if (isLoading) return <div className="p-8">Loading...</div>;
+  if (isLoading) return <div className="p-8">{t("common.loading")}</div>;
   if (isError) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -24,25 +26,25 @@ function Protected({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <ToastProvider>
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route
-        path="/*"
-        element={
-          <Protected>
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/users" element={<Users />} />
-                <Route path="/users/:id" element={<UserDetail />} />
-                <Route path="/sync-runs" element={<SyncRuns />} />
-                <Route path="/settings" element={<Settings />} />
-              </Routes>
-            </Layout>
-          </Protected>
-        }
-      />
-    </Routes>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="/*"
+          element={
+            <Protected>
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/users" element={<Users />} />
+                  <Route path="/users/:id" element={<UserDetail />} />
+                  <Route path="/sync-runs" element={<SyncRuns />} />
+                  <Route path="/settings" element={<Settings />} />
+                </Routes>
+              </Layout>
+            </Protected>
+          }
+        />
+      </Routes>
     </ToastProvider>
   );
 }

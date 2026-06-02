@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { useToast } from "../components/ToastProvider";
@@ -14,6 +15,7 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
 }
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: stats, refetch } = useQuery({
     queryKey: ["stats"],
@@ -54,12 +56,12 @@ export default function Dashboard() {
     return () => es.close();
   }, [refetch, qc]);
 
-  if (!stats) return <div>Loading...</div>;
+  if (!stats) return <div>{t("common.loading")}</div>;
 
   return (
     <div>
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-        <h2 className="text-2xl font-semibold">Dashboard</h2>
+        <h2 className="text-2xl font-semibold">{t("dashboard.title")}</h2>
         <div className="flex items-center gap-3">
           <button
             onClick={() => triggerDue.mutate()}
@@ -67,38 +69,38 @@ export default function Dashboard() {
             className="bg-sky-600 hover:bg-sky-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm"
           >
             {triggerDue.isPending
-              ? "Starting…"
-              : `Sync all due (${stats.users_due_for_sync})`}
+              ? t("common.starting")
+              : t("dashboard.syncAllDue", { count: stats.users_due_for_sync })}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Total users" value={stats.total_users} />
-        <StatCard label="Enabled users" value={stats.enabled_users} />
-        <StatCard label="Photos downloaded" value={stats.total_photos} />
-        <StatCard label="Downloaded today" value={stats.downloaded_today} />
-        <StatCard label="Active syncs" value={stats.active_syncs} />
-        <StatCard label="Failed syncs" value={stats.failed_syncs} />
-        <StatCard label="Due for sync" value={stats.users_due_for_sync} />
+        <StatCard label={t("dashboard.totalUsers")} value={stats.total_users} />
+        <StatCard label={t("dashboard.enabledUsers")} value={stats.enabled_users} />
+        <StatCard label={t("dashboard.photosDownloaded")} value={stats.total_photos} />
+        <StatCard label={t("dashboard.downloadedToday")} value={stats.downloaded_today} />
+        <StatCard label={t("dashboard.activeSyncs")} value={stats.active_syncs} />
+        <StatCard label={t("dashboard.failedSyncs")} value={stats.failed_syncs} />
+        <StatCard label={t("dashboard.dueForSync")} value={stats.users_due_for_sync} />
       </div>
       <div className="grid md:grid-cols-2 gap-6">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <h3 className="font-medium mb-3">Live events</h3>
+          <h3 className="font-medium mb-3">{t("dashboard.liveEvents")}</h3>
           <ul className="text-sm text-slate-400 space-y-1 max-h-64 overflow-auto">
-            {events.length === 0 && <li>No events yet</li>}
+            {events.length === 0 && <li>{t("dashboard.noEvents")}</li>}
             {events.map((e, i) => (
               <li key={i}>{e}</li>
             ))}
           </ul>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <h3 className="font-medium mb-3">Quick links</h3>
+          <h3 className="font-medium mb-3">{t("dashboard.quickLinks")}</h3>
           <Link to="/users" className="text-sky-400 hover:underline block">
-            Manage users — sync per account
+            {t("dashboard.manageUsersLink")}
           </Link>
           <Link to="/sync-runs" className="text-sky-400 hover:underline block mt-2">
-            View sync history — retry failed runs
+            {t("dashboard.syncHistoryLink")}
           </Link>
         </div>
       </div>

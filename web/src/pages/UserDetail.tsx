@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useToast } from "../components/ToastProvider";
@@ -16,6 +17,7 @@ import {
   hoursToSeconds,
   presetForSeconds,
   secondsToHours,
+  syncIntervalPresetLabel,
 } from "../utils/syncSchedule";
 
 function Section({
@@ -38,6 +40,7 @@ function Section({
 }
 
 export default function UserDetail() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const userId = Number(id);
   const qc = useQueryClient();
@@ -110,12 +113,12 @@ export default function UserDetail() {
 
   useEffect(() => {
     if (searchParams.get("google") === "connected") {
-      toast.success("Google Photos connected");
+      toast.success(t("google.connected"));
       qc.invalidateQueries({ queryKey: ["user", userId] });
       searchParams.delete("google");
       setSearchParams(searchParams, { replace: true });
     }
-  }, [searchParams, setSearchParams, toast, qc, userId]);
+  }, [searchParams, setSearchParams, toast, qc, userId, t]);
 
   const testImmich = useMutation({
     mutationFn: () => api.testUserImmich(userId),
@@ -140,7 +143,11 @@ export default function UserDetail() {
           ? hoursToSeconds(parseFloat(customHours) || 6)
           : Number(intervalPreset);
       return api.updateUser(userId, {
-        display_name: displayName.trim() || user!.account_label || user!.apple_id || "User",
+        display_name:
+          displayName.trim() ||
+          user!.account_label ||
+          user!.apple_id ||
+          t("userDetail.defaultUserName"),
         apple_id: appleIdEdit.trim() || undefined,
         download_dir: downloadDir.trim(),
         sync_interval_seconds: seconds,
@@ -151,14 +158,14 @@ export default function UserDetail() {
       });
     },
     onSuccess: () => {
-      toast.success("User settings saved");
+      toast.success(t("userDetail.settingsSaved"));
       qc.invalidateQueries({ queryKey: ["user", userId] });
       qc.invalidateQueries({ queryKey: ["users"] });
     },
     onError: (err: Error) => toast.error(err.message),
   });
 
-  if (!user) return <div>Loading...</div>;
+  if (!user) return <div>{t("common.loading")}</div>;
 
   const isActive =
     user.activity_status === "queued" ||
@@ -170,25 +177,39 @@ export default function UserDetail() {
   const isCountingIcloud = user.activity_status === "counting_icloud";
   const isCountingGoogle = user.activity_status === "counting_google";
   const syncBusy = user.active_syncs_by_scope ?? {};
-  const title = user.account_label || user.display_name || user.apple_id || user.google_account_email || `User #${user.id}`;
+  const title =
+    user.account_label ||
+    user.display_name ||
+    user.apple_id ||
+    user.google_account_email ||
+    t("common.userNumber", { id: user.id });
 
   const syncIntervalSeconds =
     intervalPreset === "custom"
       ? hoursToSeconds(parseFloat(customHours) || 6)
       : Number(intervalPreset);
 
+  const activityMessage =
+    user.activity_status === "counting_icloud"
+      ? t("userDetail.indexingIcloud")
+      : user.activity_status === "counting_google"
+        ? t("userDetail.indexingGoogle")
+        : user.activity_status === "counting"
+          ? t("userDetail.indexingPhotos")
+          : t("userDetail.syncInProgress");
+
   return (
     <div className="max-w-5xl">
       <div className="flex items-center gap-3 mb-2">
         <Link to="/users" className="text-slate-500 hover:text-slate-300 text-sm">
-          ← Users
+          {t("userDetail.backToUsers")}
         </Link>
       </div>
       <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div>
           <h2 className="text-2xl font-semibold">{title}</h2>
           <p className="text-slate-500 text-sm mt-1">
-            User #{user.id} · iCloud + Google Photos · use {"{source}/"} in path template for dual-source
+            {t("userDetail.subtitle", { id: user.id })}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -201,74 +222,51 @@ export default function UserDetail() {
       {isActive && (
         <div className="bg-sky-900/30 border border-sky-700 rounded-xl p-4 mb-6 flex items-center gap-3">
           <span className="inline-block w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
-          <span className="text-sky-300 text-sm">
-            {user.activity_status === "counting_icloud"
-              ? "Indexing iCloud library…"
-              : user.activity_status === "counting_google"
-                ? "Indexing Google Photos…"
-                : user.activity_status === "counting"
-                  ? "Indexing photos…"
-                  : "Sync in progress — this page refreshes automatically"}
-          </span>
+          <span className="text-sky-300 text-sm">{activityMessage}</span>
         </div>
       )}
 
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p className="text-slate-500 text-sm">iCloud photos</p>
+          <p className="text-slate-500 text-sm">{t("userDetail.icloudPhotos")}</p>
           <p className="text-2xl font-semibold mt-1">
             {isCountingIcloud
               ? (user.icloud_photos_count ?? 0).toLocaleString()
-              : (user.icloud_photos_count?.toLocaleString() ?? "—")}
+              : (user.icloud_photos_count?.toLocaleString() ?? t("common.dash"))}
           </p>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p className="text-slate-500 text-sm">Google photos</p>
+          <p className="text-slate-500 text-sm">{t("userDetail.googlePhotos")}</p>
           <p className="text-2xl font-semibold mt-1">
             {isCountingGoogle
               ? (user.google_photos_count ?? 0).toLocaleString()
-              : (user.google_photos_count?.toLocaleString() ?? "—")}
+              : (user.google_photos_count?.toLocaleString() ?? t("common.dash"))}
           </p>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p className="text-slate-500 text-sm">Downloaded (all)</p>
+          <p className="text-slate-500 text-sm">{t("userDetail.downloadedAll")}</p>
           <p className="text-2xl font-semibold mt-1">{counts?.downloaded_count ?? 0}</p>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p className="text-slate-500 text-sm">Remaining (est.)</p>
+          <p className="text-slate-500 text-sm">{t("userDetail.remainingEst")}</p>
           <p className="text-2xl font-semibold mt-1">
             {isCountingIcloud || isCountingGoogle
               ? "…"
-              : (counts?.remaining_to_download?.toLocaleString() ?? "—")}
+              : (counts?.remaining_to_download?.toLocaleString() ?? t("common.dash"))}
           </p>
         </div>
       </div>
 
       <div className="space-y-6 mb-8">
-        <Section
-          title="iCloud"
-          description="Authorize with Apple ID, password, and 2FA. Count indexes metadata; Sync downloads files."
-        >
+        <Section title={t("userDetail.icloudTitle")} description={t("userDetail.icloudDesc")}>
           {!user.apple_id && (
-            <p className="text-amber-400 text-sm mb-3">
-              Set an Apple ID in Storage & profile below to use iCloud.
-            </p>
+            <p className="text-amber-400 text-sm mb-3">{t("userDetail.setAppleId")}</p>
           )}
-          <HelpBox title="Before you sign in">
+          <HelpBox title={t("userDetail.beforeSignIn")}>
             <ul className="list-disc list-inside space-y-1">
-              <li>
-                On iPhone/iPad: <strong className="text-slate-300">Settings → Apple ID → iCloud →
-                Access iCloud Data on the Web</strong> must be on.
-              </li>
-              <li>
-                <strong className="text-slate-300">Advanced Data Protection</strong> must be off
-                (blocks server photo API).
-              </li>
-              <li>
-                Use your Apple ID password; if 2FA is enabled, approve on a trusted device or enter
-                the code in Telegram with <span className="font-mono">/code 123456</span> (if
-                configured in Settings).
-              </li>
+              <li>{t("userDetail.icloudHelp1")}</li>
+              <li>{t("userDetail.icloudHelp2")}</li>
+              <li>{t("userDetail.icloudHelp3")}</li>
             </ul>
           </HelpBox>
           <div className="flex flex-wrap items-center gap-3 mb-3">
@@ -282,7 +280,9 @@ export default function UserDetail() {
                 />
                 {user.icloud_2fa_at && (
                   <span className="text-slate-400 text-sm">
-                    Trusted session: {format2faDaysLeft(user.days_until_2fa_expires)}
+                    {t("userDetail.trustedSession", {
+                      label: format2faDaysLeft(user.days_until_2fa_expires),
+                    })}
                   </span>
                 )}
               </>
@@ -290,14 +290,12 @@ export default function UserDetail() {
           </div>
           {user.icloud_authenticated_at && (
             <p className="text-xs text-slate-500 mb-3">
-              Last sign-in: {new Date(user.icloud_authenticated_at).toLocaleString()}
+              {t("userDetail.lastSignIn", {
+                time: new Date(user.icloud_authenticated_at).toLocaleString(),
+              })}
             </p>
           )}
-          <FieldHelp className="mb-3">
-            <strong className="text-slate-400">Count iCloud</strong> — scans the library into the
-            database (no files). <strong className="text-slate-400">Sync iCloud</strong> — downloads
-            pending photos only.
-          </FieldHelp>
+          <FieldHelp className="mb-3">{t("userDetail.countSyncHelp")}</FieldHelp>
           <div className="flex flex-wrap gap-2">
             <FetchCountButton
               userId={userId}
@@ -318,32 +316,21 @@ export default function UserDetail() {
           </div>
         </Section>
 
-        <Section
-          title="Google Photos"
-          description="One-time OAuth per user. App credentials are configured under Settings → Google Photos OAuth."
-        >
-          <HelpBox title="Setup checklist">
+        <Section title={t("userDetail.googleTitle")} description={t("userDetail.googleDesc")}>
+          <HelpBox title={t("userDetail.googleChecklist")}>
             <ol className="list-decimal list-inside space-y-1.5">
-              <li>
-                In <strong className="text-slate-300">Settings</strong>: Google OAuth client ID +
-                secret, and server <span className="font-mono">TOKEN_ENCRYPTION_KEY</span> in .env.
-              </li>
-              <li>Click <strong className="text-slate-300">Connect Google Photos</strong> below and
-                sign in with the Google account that owns the library.</li>
-              <li>
-                Use <strong className="text-slate-300">Count Google</strong> then{" "}
-                <strong className="text-slate-300">Sync Google</strong> (same as iCloud).
-              </li>
+              <li>{t("userDetail.googleStep1")}</li>
+              <li>{t("userDetail.googleStep2")}</li>
+              <li>{t("userDetail.googleStep3")}</li>
             </ol>
           </HelpBox>
           {user.google_account_email && (
-            <p className="text-sm text-slate-400 mb-2">Connected as {user.google_account_email}</p>
+            <p className="text-sm text-slate-400 mb-2">
+              {t("userDetail.connectedAs", { email: user.google_account_email })}
+            </p>
           )}
           <ConnectGoogleButton userId={userId} disabled={!user.enabled} />
-          <FieldHelp className="mt-3">
-            Opens Google sign-in in a new tab. After approving, you are redirected back to this user
-            page. If connect fails, check redirect URI in Google Cloud matches Settings.
-          </FieldHelp>
+          <FieldHelp className="mt-3">{t("userDetail.googleConnectHelp")}</FieldHelp>
           <div className="flex flex-wrap gap-2 mt-4">
             <FetchCountButton
               userId={userId}
@@ -363,13 +350,10 @@ export default function UserDetail() {
           </div>
         </Section>
 
-        <Section
-          title="Sync schedule"
-          description="The background worker runs a full download on this interval when scheduling is enabled."
-        >
+        <Section title={t("userDetail.scheduleTitle")} description={t("userDetail.scheduleDesc")}>
           <div className="grid sm:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Interval</label>
+              <label className="block text-sm text-slate-400 mb-1">{t("userDetail.interval")}</label>
               <select
                 value={intervalPreset}
                 onChange={(e) => setIntervalPreset(e.target.value)}
@@ -377,15 +361,15 @@ export default function UserDetail() {
               >
                 {SYNC_INTERVAL_PRESETS.map((p) => (
                   <option key={p.seconds} value={String(p.seconds)}>
-                    {p.label}
+                    {syncIntervalPresetLabel(p.seconds)}
                   </option>
                 ))}
-                <option value="custom">Custom (hours)</option>
+                <option value="custom">{t("syncInterval.custom")}</option>
               </select>
             </div>
             {intervalPreset === "custom" && (
               <div>
-                <label className="block text-sm text-slate-400 mb-1">Hours between syncs</label>
+                <label className="block text-sm text-slate-400 mb-1">{t("userDetail.hoursBetween")}</label>
                 <input
                   type="number"
                   min={0.083}
@@ -394,7 +378,7 @@ export default function UserDetail() {
                   onChange={(e) => setCustomHours(e.target.value)}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
                 />
-                <p className="text-xs text-slate-500 mt-1">Minimum 5 minutes (0.083 h)</p>
+                <p className="text-xs text-slate-500 mt-1">{t("userDetail.minInterval")}</p>
               </div>
             )}
           </div>
@@ -406,40 +390,39 @@ export default function UserDetail() {
               onChange={(e) => setScheduledEnabled(e.target.checked)}
               className="rounded"
             />
-            Scheduled sync enabled
+            {t("userDetail.scheduledEnabled")}
           </label>
 
           <dl className="grid sm:grid-cols-2 gap-3 text-sm mb-4">
             <div className="bg-slate-800/50 rounded-lg px-3 py-2">
-              <dt className="text-slate-500">Current interval</dt>
+              <dt className="text-slate-500">{t("userDetail.currentInterval")}</dt>
               <dd className="text-slate-200 mt-0.5">{formatSyncInterval(syncIntervalSeconds)}</dd>
             </div>
             <div className="bg-slate-800/50 rounded-lg px-3 py-2">
-              <dt className="text-slate-500">Next scheduled sync</dt>
+              <dt className="text-slate-500">{t("userDetail.nextScheduled")}</dt>
               <dd className="text-slate-200 mt-0.5">
                 {scheduledEnabled && user.next_sync_at
                   ? new Date(user.next_sync_at).toLocaleString()
                   : scheduledEnabled
-                    ? "Soon"
-                    : "— (disabled)"}
+                    ? t("common.soon")
+                    : t("common.disabledParen")}
               </dd>
             </div>
             <div className="bg-slate-800/50 rounded-lg px-3 py-2">
-              <dt className="text-slate-500">Last sync</dt>
+              <dt className="text-slate-500">{t("userDetail.lastSync")}</dt>
               <dd className="text-slate-200 mt-0.5">
-                {user.last_sync_at ? new Date(user.last_sync_at).toLocaleString() : "—"}
+                {user.last_sync_at
+                  ? new Date(user.last_sync_at).toLocaleString()
+                  : t("common.dash")}
               </dd>
             </div>
           </dl>
         </Section>
 
-        <Section
-          title="Storage & profile"
-          description="Photos are saved under the download directory using the global path template from Settings."
-        >
+        <Section title={t("userDetail.storageTitle")} description={t("userDetail.storageDesc")}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Display name</label>
+              <label className="block text-sm text-slate-400 mb-1">{t("userDetail.displayName")}</label>
               <input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
@@ -447,34 +430,27 @@ export default function UserDetail() {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Apple ID (iCloud)</label>
+              <label className="block text-sm text-slate-400 mb-1">{t("userDetail.appleId")}</label>
               <input
                 value={appleIdEdit}
                 onChange={(e) => setAppleIdEdit(e.target.value)}
-                placeholder="apple@icloud.com"
+                placeholder={t("userDetail.appleIdPlaceholder")}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Download directory</label>
+              <label className="block text-sm text-slate-400 mb-1">{t("userDetail.downloadDir")}</label>
               <input
                 value={downloadDir}
                 onChange={(e) => setDownloadDir(e.target.value)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono"
               />
-              <FieldHelp>
-                Absolute path on the server. Must match an Immich external library import path if
-                you use Immich. For iCloud + Google, use a path template with {"{source}"} in
-                Settings.
-              </FieldHelp>
+              <FieldHelp>{t("userDetail.downloadDirHelp")}</FieldHelp>
             </div>
           </div>
         </Section>
 
-        <Section
-          title="Immich external library"
-          description="Link this Apple ID to an Immich external library. Server URL and API key are configured in Settings."
-        >
+        <Section title={t("userDetail.immichTitle")} description={t("userDetail.immichDesc")}>
           <label className="flex items-center gap-2 text-sm text-slate-300 mb-4 cursor-pointer">
             <input
               type="checkbox"
@@ -482,74 +458,66 @@ export default function UserDetail() {
               onChange={(e) => setImmichScanAfterSync(e.target.checked)}
               className="rounded"
             />
-            Connect this user as an Immich external library
+            {t("userDetail.immichConnect")}
           </label>
           {immichScanAfterSync && (
             <div className="space-y-4">
               {immichLibraries.data?.libraries && immichLibraries.data.libraries.length > 0 ? (
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">External library</label>
+                  <label className="block text-sm text-slate-400 mb-1">
+                    {t("userDetail.externalLibrary")}
+                  </label>
                   <select
                     value={immichLibraryId}
                     onChange={(e) => setImmichLibraryId(e.target.value)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
                   >
-                    <option value="">Select a library…</option>
+                    <option value="">{t("userDetail.selectLibrary")}</option>
                     {immichLibraries.data.libraries.map((lib) => (
                       <option key={lib.id} value={lib.id}>
                         {lib.name}
-                        {lib.importPaths?.length
-                          ? ` — ${lib.importPaths.join(", ")}`
-                          : ""}
+                        {lib.importPaths?.length ? ` — ${lib.importPaths.join(", ")}` : ""}
                       </option>
                     ))}
                   </select>
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">External library ID</label>
+                  <label className="block text-sm text-slate-400 mb-1">
+                    {t("userDetail.externalLibraryId")}
+                  </label>
                   <input
                     value={immichLibraryId}
                     onChange={(e) => setImmichLibraryId(e.target.value)}
-                    placeholder="UUID from Immich external library"
+                    placeholder={t("userDetail.libraryUuidPlaceholder")}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono"
                   />
                   {immichLibraries.isError && (
-                    <p className="text-xs text-amber-400 mt-1">
-                      Could not load libraries — configure Immich in Settings or paste the UUID
-                      manually.
-                    </p>
+                    <p className="text-xs text-amber-400 mt-1">{t("userDetail.librariesLoadError")}</p>
                   )}
                 </div>
               )}
-              <p className="text-xs text-slate-500">
-                Download directory must be inside that library&apos;s import path in Immich. After
-                each successful sync, a library scan is triggered.
-              </p>
+              <p className="text-xs text-slate-500">{t("userDetail.immichPathHelp")}</p>
               <button
                 type="button"
                 onClick={() => testImmich.mutate()}
                 disabled={testImmich.isPending || !immichLibraryId.trim()}
                 className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 px-4 py-2 rounded-lg text-sm"
               >
-                {testImmich.isPending ? "Calling Immich…" : "Test library scan"}
+                {testImmich.isPending
+                  ? t("common.callingImmich")
+                  : t("userDetail.testLibraryScan")}
               </button>
             </div>
           )}
         </Section>
 
-        <Section
-          title="Sync all providers"
-          description="Runs iCloud and Google in parallel. The scheduler uses this same behavior on each user's interval."
-        >
-          <FieldHelp className="mb-3">
-            Blocked while a full <span className="font-mono">all</span> sync is already running.
-            Per-provider sync buttons can still run side by side (e.g. iCloud + Google at once).
-          </FieldHelp>
+        <Section title={t("userDetail.syncAllTitle")} description={t("userDetail.syncAllDesc")}>
+          <FieldHelp className="mb-3">{t("userDetail.syncAllHelp")}</FieldHelp>
           <SyncNowButton
             userId={userId}
             disabled={!user.enabled || syncBusy.all}
-            label="Sync all"
+            label={t("buttons.syncAll")}
           />
         </Section>
 
@@ -560,36 +528,38 @@ export default function UserDetail() {
             disabled={saveSettings.isPending || !downloadDir.trim()}
             className="bg-sky-600 hover:bg-sky-500 disabled:opacity-50 px-5 py-2 rounded-lg text-sm font-medium"
           >
-            {saveSettings.isPending ? "Saving…" : "Save settings"}
+            {saveSettings.isPending ? t("common.saving") : t("userDetail.saveSettings")}
           </button>
           <button
             type="button"
             onClick={() => saveSettings.mutate({ reschedule_sync: true })}
             disabled={saveSettings.isPending || !scheduledEnabled}
             className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 px-4 py-2 rounded-lg text-sm"
-            title="Set next sync to now + interval"
+            title={t("userDetail.resetNextSyncTitle")}
           >
-            Reset next sync time
+            {t("userDetail.resetNextSync")}
           </button>
         </div>
       </div>
 
-      <h3 className="font-medium mb-3">Recent sync runs</h3>
+      <h3 className="font-medium mb-3">{t("userDetail.recentSyncRuns")}</h3>
       <table className="w-full text-sm mb-8">
         <thead>
           <tr className="text-slate-500 border-b border-slate-800">
-            <th className="text-left py-2">Run</th>
-            <th className="text-left py-2">Status</th>
-            <th className="text-left py-2">Downloaded</th>
-            <th className="text-left py-2">Failed</th>
-            <th className="text-left py-2">Started</th>
+            <th className="text-left py-2">{t("userDetail.colRun")}</th>
+            <th className="text-left py-2">{t("syncRuns.colStatus")}</th>
+            <th className="text-left py-2">{t("syncRuns.colDownloaded")}</th>
+            <th className="text-left py-2">{t("syncRuns.colFailed")}</th>
+            <th className="text-left py-2">{t("syncRuns.colStarted")}</th>
           </tr>
         </thead>
         <tbody>
           {syncRuns?.map((r) => (
             <tr key={r.id} className="border-b border-slate-800/50">
-              <td className="py-2">#{r.id}</td>
-              <td className="py-2 capitalize">{r.status}</td>
+              <td className="py-2">{t("common.runNumber", { id: r.id })}</td>
+              <td className="py-2 capitalize">
+                {t(`syncRunStatus.${r.status}`, { defaultValue: r.status })}
+              </td>
               <td className="py-2">{r.photos_downloaded}</td>
               <td className="py-2">{r.photos_failed}</td>
               <td className="py-2 text-slate-500">{new Date(r.started_at).toLocaleString()}</td>
@@ -598,16 +568,18 @@ export default function UserDetail() {
         </tbody>
       </table>
       {(!syncRuns || syncRuns.length === 0) && (
-        <p className="text-slate-500 text-sm mb-8">No sync runs yet.</p>
+        <p className="text-slate-500 text-sm mb-8">{t("userDetail.noSyncRuns")}</p>
       )}
 
-      <h3 className="font-medium mb-3">Recent photos ({photos?.length ?? 0})</h3>
+      <h3 className="font-medium mb-3">
+        {t("userDetail.recentPhotos", { count: photos?.length ?? 0 })}
+      </h3>
       <table className="w-full text-sm">
         <thead>
           <tr className="text-slate-500 border-b border-slate-800">
-            <th className="text-left py-2">Filename</th>
-            <th className="text-left py-2">Status</th>
-            <th className="text-left py-2">Size</th>
+            <th className="text-left py-2">{t("userDetail.colFilename")}</th>
+            <th className="text-left py-2">{t("syncRuns.colStatus")}</th>
+            <th className="text-left py-2">{t("userDetail.colSize")}</th>
           </tr>
         </thead>
         <tbody>
@@ -616,7 +588,7 @@ export default function UserDetail() {
               <td className="py-2">{p.filename}</td>
               <td className="py-2">{p.status}</td>
               <td className="py-2 text-slate-500">
-                {p.file_size ? `${(p.file_size / 1024).toFixed(0)} KB` : "—"}
+                {p.file_size ? `${(p.file_size / 1024).toFixed(0)} KB` : t("common.dash")}
               </td>
             </tr>
           ))}

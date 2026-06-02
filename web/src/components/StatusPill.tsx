@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 type Variant = "auth" | "activity";
 
 const AUTH_STYLES: Record<string, string> = {
@@ -6,14 +8,6 @@ const AUTH_STYLES: Record<string, string> = {
   expired: "bg-red-900/50 text-red-400",
   not_authorized: "bg-slate-800 text-slate-400",
   not_linked: "bg-slate-800 text-slate-500",
-};
-
-const AUTH_LABELS: Record<string, string> = {
-  authorized: "Authorized",
-  reauth_required: "Re-auth required",
-  expired: "Session expired",
-  not_authorized: "Not authorized",
-  not_linked: "Not linked",
 };
 
 const ACTIVITY_STYLES: Record<string, string> = {
@@ -29,19 +23,6 @@ const ACTIVITY_STYLES: Record<string, string> = {
   idle: "bg-slate-800 text-slate-400",
 };
 
-const ACTIVITY_LABELS: Record<string, string> = {
-  completed: "Sync done",
-  count_ready: "Indexed",
-  counting: "Indexing",
-  counting_icloud: "Indexing iCloud",
-  counting_google: "Indexing Google",
-  syncing: "Syncing",
-  queued: "Queued",
-  failed: "Failed",
-  count_failed: "Index failed",
-  idle: "Idle",
-};
-
 type Props = {
   variant: Variant;
   status: string;
@@ -49,10 +30,11 @@ type Props = {
 };
 
 export default function StatusPill({ variant, status, className = "" }: Props) {
+  const { t } = useTranslation();
   const styles = variant === "auth" ? AUTH_STYLES : ACTIVITY_STYLES;
-  const labels = variant === "auth" ? AUTH_LABELS : ACTIVITY_LABELS;
   const style = styles[status] ?? "bg-slate-800 text-slate-400";
-  const label = labels[status] ?? status.replace(/_/g, " ");
+  const key = `status.${variant}.${status}`;
+  const label = t(key, { defaultValue: status.replace(/_/g, " ") });
 
   return (
     <span

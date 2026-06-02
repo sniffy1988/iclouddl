@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { api, SettingsData } from "../api/client";
 import FieldHelp, { HelpBox } from "../components/FieldHelp";
 import { useToast } from "../components/ToastProvider";
 
-const PATH_TEMPLATE_HELP =
-  "Use / between folders. Tokens: YYYY, YY, MM, DD, HH, mm, ss, {source}, and {filename}. For iCloud + Google on one user, include {source} so files do not overwrite each other.";
+const linkClass = "text-sky-400 hover:underline";
+const monoClass = "font-mono text-slate-300";
+const strongClass = "text-slate-300 font-semibold";
 
 export default function Settings() {
+  const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const { data: settings, isLoading } = useQuery({
@@ -58,7 +61,7 @@ export default function Settings() {
       setImmichApiKeyInput("");
       setAdminPasswordInput("");
       setGoogleSecretInput("");
-      toast.success("Settings saved");
+      toast.success(t("settings.saved"));
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -66,8 +69,8 @@ export default function Settings() {
   const testTg = useMutation({
     mutationFn: api.testTelegram,
     onSuccess: (data) => {
-      if (data.ok) toast.success("Test message sent");
-      else toast.error("Failed — check token and chat ID, then Save");
+      if (data.ok) toast.success(t("settings.testMessageSent"));
+      else toast.error(t("settings.testMessageFailed"));
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -80,19 +83,16 @@ export default function Settings() {
     },
     onError: (err: Error) => toast.error(err.message),
   });
-  if (isLoading || !settings) return <div>Loading...</div>;
+
+  if (isLoading || !settings) return <div>{t("common.loading")}</div>;
 
   const syncHours = (form.default_sync_interval_seconds ?? settings.default_sync_interval_seconds) / 3600;
   const redirectUri = settings.google_oauth_redirect_uri;
 
   return (
     <div className="max-w-3xl">
-      <h2 className="text-2xl font-semibold mb-2">Settings</h2>
-      <p className="text-slate-500 text-sm mb-8">
-        Values saved here are stored in the database. Some secrets must still be set in the server{" "}
-        <span className="font-mono text-slate-400">.env</span> file (see Google Photos section).
-        Restart the worker after changing the Telegram bot token.
-      </p>
+      <h2 className="text-2xl font-semibold mb-2">{t("settings.title")}</h2>
+      <p className="text-slate-500 text-sm mb-8">{t("settings.intro")}</p>
 
       <form
         className="space-y-8"
@@ -102,73 +102,84 @@ export default function Settings() {
         }}
       >
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-          <h3 className="text-lg font-medium text-amber-300">Admin login</h3>
-          <FieldHelp>
-            Password for this web UI only. On first visit, use the login screen to create the
-            initial admin account (stored as a bcrypt hash in the database).
-          </FieldHelp>
+          <h3 className="text-lg font-medium text-amber-300">{t("settings.adminLogin")}</h3>
+          <FieldHelp>{t("settings.adminLoginHelp")}</FieldHelp>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">New admin password</label>
+            <label className="block text-sm text-slate-400 mb-1">{t("settings.newAdminPassword")}</label>
             <input
               type="password"
               value={adminPasswordInput}
               onChange={(e) => setAdminPasswordInput(e.target.value)}
               placeholder={
                 settings.admin_password_set
-                  ? "Leave blank to keep current password"
-                  : "At least 8 characters"
+                  ? t("settings.keepPassword")
+                  : t("login.placeholderMin8")
               }
               autoComplete="new-password"
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
             />
             {settings.admin_password_set && (
-              <FieldHelp>A password is already stored. Enter a new one only to change it.</FieldHelp>
+              <FieldHelp>{t("settings.passwordAlreadySet")}</FieldHelp>
             )}
           </div>
         </section>
 
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-          <h3 className="text-lg font-medium text-sky-300">Telegram</h3>
+          <h3 className="text-lg font-medium text-sky-300">{t("settings.telegram")}</h3>
 
-          <HelpBox title="Where to get these values">
+          <HelpBox title={t("settings.helpWhereToGet")}>
             <ol className="list-decimal list-inside space-y-1.5">
               <li>
-                Open Telegram and message{" "}
-                <a
-                  href="https://t.me/BotFather"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sky-400 hover:underline"
-                >
-                  @BotFather
-                </a>
-                .
+                <Trans
+                  i18nKey="settings.telegramHelp1"
+                  components={{
+                    1: (
+                      <a
+                        href="https://t.me/BotFather"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={linkClass}
+                      />
+                    ),
+                  }}
+                />
               </li>
               <li>
-                Send <span className="font-mono text-slate-300">/newbot</span>, follow prompts, then
-                copy the <strong className="text-slate-300">HTTP API token</strong> (looks like{" "}
-                <span className="font-mono">123456789:AAH…</span>).
+                <Trans
+                  i18nKey="settings.telegramHelp2"
+                  components={{
+                    1: <span className={monoClass} />,
+                    2: <strong className={strongClass} />,
+                    3: <span className="font-mono" />,
+                  }}
+                />
               </li>
               <li>
-                For <strong className="text-slate-300">Admin chat ID</strong>: add your bot to a
-                group/channel, send a message, then open{" "}
-                <span className="font-mono text-slate-300">
-                  https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates
-                </span>{" "}
-                and find <span className="font-mono">chat.id</span> (often negative for groups).
+                <Trans
+                  i18nKey="settings.telegramHelp3"
+                  components={{
+                    1: <strong className={strongClass} />,
+                    2: <span className={monoClass} />,
+                    3: <span className="font-mono" />,
+                  }}
+                />
               </li>
               <li>
-                Optional <strong className="text-slate-300">Allowed user IDs</strong>: your numeric
-                Telegram user ID from bots like{" "}
-                <a
-                  href="https://t.me/userinfobot"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sky-400 hover:underline"
-                >
-                  @userinfobot
-                </a>{" "}
-                — required for <span className="font-mono">/code</span> 2FA relay.
+                <Trans
+                  i18nKey="settings.telegramHelp4"
+                  components={{
+                    1: <strong className={strongClass} />,
+                    2: (
+                      <a
+                        href="https://t.me/userinfobot"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={linkClass}
+                      />
+                    ),
+                    3: <span className="font-mono" />,
+                  }}
+                />
               </li>
             </ol>
           </HelpBox>
@@ -182,55 +193,54 @@ export default function Settings() {
               }
               className="rounded"
             />
-            <span>Enable Telegram (daemon status + optional 2FA bot)</span>
+            <span>{t("settings.enableTelegram")}</span>
           </label>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Bot token</label>
+            <label className="block text-sm text-slate-400 mb-1">{t("settings.botToken")}</label>
             <input
               type="password"
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
               placeholder={
                 settings.telegram_bot_token_set
-                  ? settings.telegram_bot_token_masked || "•••••••• (leave blank to keep)"
-                  : "From @BotFather after /newbot"
+                  ? settings.telegram_bot_token_masked || t("settings.tokenMaskedKeep")
+                  : t("settings.tokenFromBotFather")
               }
               autoComplete="off"
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
             />
             {settings.telegram_bot_token_set && !tokenInput && (
-              <FieldHelp>Current token ends with: {settings.telegram_bot_token_masked}</FieldHelp>
+              <FieldHelp>
+                {t("settings.tokenEndsWith", { masked: settings.telegram_bot_token_masked })}
+              </FieldHelp>
             )}
           </div>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Admin chat ID</label>
+            <label className="block text-sm text-slate-400 mb-1">{t("settings.adminChatId")}</label>
             <input
               value={form.telegram_admin_chat_id ?? ""}
               onChange={(e) =>
                 setForm((f) => ({ ...f, telegram_admin_chat_id: e.target.value }))
               }
-              placeholder="-1001234567890"
+              placeholder={t("settings.adminChatIdPlaceholder")}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
             />
-            <FieldHelp>Group or channel ID where daemon sync/count alerts are posted.</FieldHelp>
+            <FieldHelp>{t("settings.adminChatIdHelp")}</FieldHelp>
           </div>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Allowed user IDs (optional)</label>
+            <label className="block text-sm text-slate-400 mb-1">{t("settings.allowedUserIds")}</label>
             <input
               value={form.telegram_allowed_user_ids ?? ""}
               onChange={(e) =>
                 setForm((f) => ({ ...f, telegram_allowed_user_ids: e.target.value }))
               }
-              placeholder="123456789,987654321"
+              placeholder={t("settings.allowedUserIdsPlaceholder")}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
             />
-            <FieldHelp>
-              Comma-separated Telegram user IDs allowed to send{" "}
-              <span className="font-mono">/code 123456</span> for iCloud 2FA.
-            </FieldHelp>
+            <FieldHelp>{t("settings.allowedUserIdsHelp")}</FieldHelp>
           </div>
 
           <button
@@ -239,64 +249,62 @@ export default function Settings() {
             disabled={testTg.isPending}
             className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm"
           >
-            {testTg.isPending ? "Sending…" : "Test daemon status message"}
+            {testTg.isPending ? t("common.sending") : t("settings.testDaemonMessage")}
           </button>
-          <FieldHelp>
-            Sends a test message to the admin chat. Save token and chat ID first. Admin chat
-            receives daemon events only (not per-user Immich or auth errors).
-          </FieldHelp>
+          <FieldHelp>{t("settings.testDaemonHelp")}</FieldHelp>
         </section>
 
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-          <h3 className="text-lg font-medium text-violet-300">Download paths</h3>
+          <h3 className="text-lg font-medium text-violet-300">{t("settings.downloadPaths")}</h3>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Photo path template</label>
+            <label className="block text-sm text-slate-400 mb-1">{t("settings.photoPathTemplate")}</label>
             <input
               value={form.download_path_template ?? ""}
               onChange={(e) =>
                 setForm((f) => ({ ...f, download_path_template: e.target.value }))
               }
-              placeholder="{source}/YYYY/MM/DD/{filename}"
+              placeholder={t("settings.pathTemplatePlaceholder")}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
             />
-            <FieldHelp>{PATH_TEMPLATE_HELP}</FieldHelp>
+            <FieldHelp>{t("settings.pathTemplateHelp")}</FieldHelp>
           </div>
 
           <div>
-            <p className="text-sm text-slate-400">Base download directory (from environment)</p>
+            <p className="text-sm text-slate-400">{t("settings.baseDownloadDir")}</p>
             <p className="font-mono text-sm mt-1 break-all">{settings.base_download_dir}</p>
-            <FieldHelp>
-              Set <span className="font-mono">BASE_DOWNLOAD_DIR</span> in .env. Each user also has
-              their own folder under this path.
-            </FieldHelp>
+            <FieldHelp>{t("settings.baseDirHelp")}</FieldHelp>
           </div>
         </section>
 
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-          <h3 className="text-lg font-medium text-violet-300">Immich</h3>
-          <FieldHelp>
-            Connects to your Immich server for optional library scans after sync. Per-user external
-            library ID is set on each user page.
-          </FieldHelp>
+          <h3 className="text-lg font-medium text-violet-300">{t("settings.immich")}</h3>
+          <FieldHelp>{t("settings.immichHelp")}</FieldHelp>
 
-          <HelpBox title="Where to get Immich API key">
+          <HelpBox title={t("settings.immichHelpTitle")}>
             <ol className="list-decimal list-inside space-y-1.5">
               <li>
-                Open your Immich web app → <strong className="text-slate-300">Account settings</strong>{" "}
-                (avatar menu).
+                <Trans
+                  i18nKey="settings.immichHelp1"
+                  components={{ 1: <strong className={strongClass} /> }}
+                />
               </li>
               <li>
-                <strong className="text-slate-300">API Keys</strong> → Create key with permissions{" "}
-                <span className="font-mono">library.read</span> and{" "}
-                <span className="font-mono">library.update</span> (or admin key for testing).
+                <Trans
+                  i18nKey="settings.immichHelp2"
+                  components={{
+                    1: <strong className={strongClass} />,
+                    2: <span className="font-mono" />,
+                    3: <span className="font-mono" />,
+                  }}
+                />
               </li>
+              <li>{t("settings.immichHelp3")}</li>
               <li>
-                Copy the key once shown — Immich does not display it again.
-              </li>
-              <li>
-                External library UUID: Immich → <strong className="text-slate-300">Administration</strong>{" "}
-                → External libraries → open library → copy ID from URL or settings.
+                <Trans
+                  i18nKey="settings.immichHelp4"
+                  components={{ 1: <strong className={strongClass} /> }}
+                />
               </li>
             </ol>
           </HelpBox>
@@ -310,32 +318,32 @@ export default function Settings() {
               }
               className="rounded"
             />
-            <span>Enable Immich library scans</span>
+            <span>{t("settings.enableImmich")}</span>
           </label>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Immich server URL</label>
+            <label className="block text-sm text-slate-400 mb-1">{t("settings.immichServerUrl")}</label>
             <input
               value={form.immich_base_url ?? ""}
               onChange={(e) =>
                 setForm((f) => ({ ...f, immich_base_url: e.target.value }))
               }
-              placeholder="https://photos.example.com"
+              placeholder={t("settings.immichUrlPlaceholder")}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
             />
-            <FieldHelp>Public base URL of Immich (no trailing slash), same host you use in the browser.</FieldHelp>
+            <FieldHelp>{t("settings.immichUrlHelp")}</FieldHelp>
           </div>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-1">API key</label>
+            <label className="block text-sm text-slate-400 mb-1">{t("settings.apiKey")}</label>
             <input
               type="password"
               value={immichApiKeyInput}
               onChange={(e) => setImmichApiKeyInput(e.target.value)}
               placeholder={
                 settings.immich_api_key_set
-                  ? `${settings.immich_api_key_masked} (leave blank to keep)`
-                  : "Paste Immich API key"
+                  ? t("settings.apiKeyKeep", { masked: settings.immich_api_key_masked })
+                  : t("settings.apiKeyPlaceholder")
               }
               autoComplete="off"
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
@@ -343,9 +351,7 @@ export default function Settings() {
           </div>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-1">
-              Scan debounce (seconds)
-            </label>
+            <label className="block text-sm text-slate-400 mb-1">{t("settings.scanDebounce")}</label>
             <input
               type="number"
               min={0}
@@ -359,7 +365,7 @@ export default function Settings() {
               }
               className="w-32 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
             />
-            <FieldHelp>Minimum seconds between scan requests for the same library.</FieldHelp>
+            <FieldHelp>{t("settings.scanDebounceHelp")}</FieldHelp>
           </div>
 
           <button
@@ -368,121 +374,142 @@ export default function Settings() {
             disabled={testImmich.isPending}
             className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm"
           >
-            {testImmich.isPending ? "Connecting…" : "Test Immich connection"}
+            {testImmich.isPending ? t("common.connecting") : t("settings.testImmich")}
           </button>
         </section>
 
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-          <h3 className="text-lg font-medium text-blue-300">Google Photos OAuth</h3>
-          <FieldHelp>
-            Global OAuth app credentials. Each user connects their own Google account on their user
-            page. Refresh tokens are encrypted in the database.
-          </FieldHelp>
+          <h3 className="text-lg font-medium text-blue-300">{t("settings.googleOAuth")}</h3>
+          <FieldHelp>{t("settings.googleOAuthHelp")}</FieldHelp>
 
           {!settings.token_encryption_key_set && (
             <div className="rounded-lg border border-amber-700/60 bg-amber-900/20 px-3 py-2 text-xs text-amber-200">
-              <strong>TOKEN_ENCRYPTION_KEY</strong> is not set in .env — Google connect will fail
-              until you add it and restart the API/worker. Generate:{" "}
-              <span className="font-mono block mt-1 text-amber-100/90">
-                python -c &quot;from cryptography.fernet import Fernet;
-                print(Fernet.generate_key().decode())&quot;
-              </span>
+              <strong>TOKEN_ENCRYPTION_KEY</strong> {t("settings.tokenKeyMissing")}
+              <span className="font-mono block mt-1 text-amber-100/90">{t("settings.tokenKeyCmd")}</span>
             </div>
           )}
 
-          <HelpBox title="Server .env (not stored in database)">
+          <HelpBox title={t("settings.serverEnvTitle")}>
             <ul className="list-disc list-inside space-y-1.5">
               <li>
-                <span className="font-mono text-slate-300">WEB_PUBLIC_BASE_URL</span> — exact URL
-                you use to open this app (e.g.{" "}
-                <span className="font-mono">{settings.web_public_base_url}</span>). Must match
-                Google redirect host.
+                <Trans
+                  i18nKey="settings.serverEnvWebUrl"
+                  values={{ url: settings.web_public_base_url }}
+                  components={{
+                    1: <span className={monoClass} />,
+                    2: <span className="font-mono" />,
+                  }}
+                />
               </li>
               <li>
-                <span className="font-mono text-slate-300">TOKEN_ENCRYPTION_KEY</span> — Fernet key
-                from the command above. Back up with your database; losing it invalidates stored
-                Google tokens.
+                <Trans
+                  i18nKey="settings.serverEnvTokenKey"
+                  components={{ 1: <span className={monoClass} /> }}
+                />
               </li>
             </ul>
             {settings.token_encryption_key_set && (
-              <p className="text-emerald-400/90 mt-2">TOKEN_ENCRYPTION_KEY is configured.</p>
+              <p className="text-emerald-400/90 mt-2">{t("settings.tokenKeyConfigured")}</p>
             )}
           </HelpBox>
 
-          <HelpBox title="Google Cloud Console — OAuth client">
+          <HelpBox title={t("settings.googleConsoleTitle")}>
             <ol className="list-decimal list-inside space-y-1.5">
               <li>
-                <a
-                  href="https://console.cloud.google.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sky-400 hover:underline"
-                >
-                  Google Cloud Console
-                </a>{" "}
-                → create or select a project.
+                <Trans
+                  i18nKey="settings.googleConsole1"
+                  components={{
+                    1: (
+                      <a
+                        href="https://console.cloud.google.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={linkClass}
+                      />
+                    ),
+                  }}
+                />
               </li>
               <li>
-                <strong className="text-slate-300">APIs & Services → Library</strong> → enable{" "}
-                <strong className="text-slate-300">Photos Library API</strong>.
+                <Trans
+                  i18nKey="settings.googleConsole2"
+                  components={{
+                    1: <strong className={strongClass} />,
+                    2: <strong className={strongClass} />,
+                  }}
+                />
               </li>
               <li>
-                <strong className="text-slate-300">APIs & Services → OAuth consent screen</strong>{" "}
-                → configure (External + test users, or publish app).
+                <Trans
+                  i18nKey="settings.googleConsole3"
+                  components={{ 1: <strong className={strongClass} /> }}
+                />
               </li>
               <li>
-                <strong className="text-slate-300">Credentials → Create credentials → OAuth client
-                ID</strong> → type <strong className="text-slate-300">Web application</strong>.
+                <Trans
+                  i18nKey="settings.googleConsole4"
+                  components={{
+                    1: <strong className={strongClass} />,
+                    2: <strong className={strongClass} />,
+                  }}
+                />
               </li>
               <li>
-                Under <strong className="text-slate-300">Authorized redirect URIs</strong>, add
-                exactly:
+                <Trans
+                  i18nKey="settings.googleConsole5"
+                  components={{ 1: <strong className={strongClass} /> }}
+                />
                 <span className="block font-mono text-sky-300/90 mt-1 break-all">{redirectUri}</span>
               </li>
               <li>
-                Copy <strong className="text-slate-300">Client ID</strong> and{" "}
-                <strong className="text-slate-300">Client secret</strong> below, then Save.
+                <Trans
+                  i18nKey="settings.googleConsole6"
+                  components={{
+                    1: <strong className={strongClass} />,
+                    2: <strong className={strongClass} />,
+                  }}
+                />
               </li>
             </ol>
           </HelpBox>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-1">OAuth client ID</label>
+            <label className="block text-sm text-slate-400 mb-1">{t("settings.oauthClientId")}</label>
             <input
               value={form.google_oauth_client_id ?? settings.google_oauth_client_id ?? ""}
               onChange={(e) =>
                 setForm((f) => ({ ...f, google_oauth_client_id: e.target.value }))
               }
-              placeholder="123456789-abc.apps.googleusercontent.com"
+              placeholder={t("settings.oauthClientIdPlaceholder")}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
             />
-            <FieldHelp>From Google Cloud → Credentials → your OAuth 2.0 Client ID.</FieldHelp>
+            <FieldHelp>{t("settings.oauthClientIdHelp")}</FieldHelp>
           </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">OAuth client secret</label>
+            <label className="block text-sm text-slate-400 mb-1">{t("settings.oauthClientSecret")}</label>
             <input
               type="password"
               value={googleSecretInput}
               onChange={(e) => setGoogleSecretInput(e.target.value)}
               placeholder={
                 settings.google_oauth_client_secret_set
-                  ? `${settings.google_oauth_client_secret_masked} (leave blank to keep)`
-                  : "GOCSPX-… from same credentials page"
+                  ? t("settings.oauthSecretKeep", {
+                      masked: settings.google_oauth_client_secret_masked,
+                    })
+                  : t("settings.oauthSecretPlaceholder")
               }
               autoComplete="off"
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
             />
-            <FieldHelp>Shown once when the client is created. Store only here (database), not in git.</FieldHelp>
+            <FieldHelp>{t("settings.oauthSecretHelp")}</FieldHelp>
           </div>
         </section>
 
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-          <h3 className="text-lg font-medium text-slate-300">Sync</h3>
+          <h3 className="text-lg font-medium text-slate-300">{t("settings.syncSection")}</h3>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-1">
-              Default sync interval (hours)
-            </label>
+            <label className="block text-sm text-slate-400 mb-1">{t("settings.defaultSyncInterval")}</label>
             <input
               type="number"
               min={1}
@@ -496,12 +523,12 @@ export default function Settings() {
               }
               className="w-32 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
             />
-            <FieldHelp>Default for new users. Each user can override on their profile.</FieldHelp>
+            <FieldHelp>{t("settings.defaultSyncHelp")}</FieldHelp>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Max concurrent downloads</label>
+              <label className="block text-sm text-slate-400 mb-1">{t("settings.maxConcurrent")}</label>
               <input
                 type="number"
                 min={1}
@@ -515,10 +542,10 @@ export default function Settings() {
                 }
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
               />
-              <FieldHelp>Split across providers when iCloud and Google sync overlap.</FieldHelp>
+              <FieldHelp>{t("settings.maxConcurrentHelp")}</FieldHelp>
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Scheduler poll (seconds)</label>
+              <label className="block text-sm text-slate-400 mb-1">{t("settings.schedulerPoll")}</label>
               <input
                 type="number"
                 min={10}
@@ -532,7 +559,7 @@ export default function Settings() {
                 }
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
               />
-              <FieldHelp>How often the worker checks for users due for scheduled sync.</FieldHelp>
+              <FieldHelp>{t("settings.schedulerPollHelp")}</FieldHelp>
             </div>
           </div>
         </section>
@@ -543,7 +570,7 @@ export default function Settings() {
             disabled={save.isPending}
             className="bg-sky-600 hover:bg-sky-500 disabled:opacity-50 px-6 py-2.5 rounded-lg font-medium"
           >
-            {save.isPending ? "Saving…" : "Save settings"}
+            {save.isPending ? t("common.saving") : t("settings.saveSettings")}
           </button>
         </div>
       </form>

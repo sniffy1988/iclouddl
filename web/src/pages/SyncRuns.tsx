@@ -1,34 +1,34 @@
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import SyncNowButton from "../components/SyncNowButton";
 
 export default function SyncRuns() {
+  const { t } = useTranslation();
   const { data: runs, isLoading } = useQuery({
     queryKey: ["sync-runs"],
     queryFn: () => api.syncRuns({ limit: 100 }),
     refetchInterval: 10000,
   });
 
-  if (isLoading) return <div>Loading...</div>;
+  if (isLoading) return <div>{t("common.loading")}</div>;
 
   return (
     <div>
-      <h2 className="text-2xl font-semibold mb-2">Sync Runs</h2>
-      <p className="text-slate-500 text-sm mb-6">
-        Re-run a failed or completed sync from the Actions column, or open the user page.
-      </p>
+      <h2 className="text-2xl font-semibold mb-2">{t("syncRuns.title")}</h2>
+      <p className="text-slate-500 text-sm mb-6">{t("syncRuns.intro")}</p>
       <table className="w-full text-sm">
         <thead>
           <tr className="text-slate-500 border-b border-slate-800">
-            <th className="text-left py-2">ID</th>
-            <th className="text-left py-2">User</th>
-            <th className="text-left py-2">Status</th>
-            <th className="text-left py-2">Downloaded</th>
-            <th className="text-left py-2">Failed</th>
-            <th className="text-left py-2">Started</th>
-            <th className="text-left py-2">Error</th>
-            <th className="text-left py-2">Actions</th>
+            <th className="text-left py-2">{t("syncRuns.colId")}</th>
+            <th className="text-left py-2">{t("syncRuns.colUser")}</th>
+            <th className="text-left py-2">{t("syncRuns.colStatus")}</th>
+            <th className="text-left py-2">{t("syncRuns.colDownloaded")}</th>
+            <th className="text-left py-2">{t("syncRuns.colFailed")}</th>
+            <th className="text-left py-2">{t("syncRuns.colStarted")}</th>
+            <th className="text-left py-2">{t("syncRuns.colError")}</th>
+            <th className="text-left py-2">{t("syncRuns.colActions")}</th>
           </tr>
         </thead>
         <tbody>
@@ -37,7 +37,7 @@ export default function SyncRuns() {
               <td className="py-3">{r.id}</td>
               <td className="py-3">
                 <Link to={`/users/${r.user_id}`} className="text-sky-400 hover:underline">
-                  User #{r.user_id}
+                  {t("common.userNumber", { id: r.user_id })}
                 </Link>
               </td>
               <td className="py-3">
@@ -52,7 +52,7 @@ export default function SyncRuns() {
                           : "bg-slate-800"
                   }`}
                 >
-                  {r.status}
+                  {t(`syncRunStatus.${r.status}`, { defaultValue: r.status })}
                 </span>
               </td>
               <td className="py-3">{r.photos_downloaded}</td>
@@ -61,7 +61,7 @@ export default function SyncRuns() {
                 {new Date(r.started_at).toLocaleString()}
               </td>
               <td className="py-3 text-slate-500 text-xs max-w-[200px] truncate">
-                {r.error_summary || "—"}
+                {r.error_summary || t("common.dash")}
               </td>
               <td className="py-3">
                 {r.status !== "running" && (
@@ -72,7 +72,7 @@ export default function SyncRuns() {
           ))}
         </tbody>
       </table>
-      {runs?.length === 0 && <p className="text-slate-500 mt-4">No sync runs yet.</p>}
+      {runs?.length === 0 && <p className="text-slate-500 mt-4">{t("syncRuns.empty")}</p>}
     </div>
   );
 }
