@@ -70,6 +70,7 @@ class UserResponse(BaseModel):
     icloud_2fa_at: datetime | None = None
     icloud_session_ok_at: datetime | None = None
     icloud_needs_auth: bool = True
+    icloud_pending_challenge: bool = False
     icloud_authorized: bool = False
     google_authorized: bool = False
     google_needs_auth: bool = True

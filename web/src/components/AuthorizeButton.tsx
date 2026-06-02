@@ -9,6 +9,7 @@ type Props = {
   appleId: string;
   icloudAuthorized?: boolean;
   icloudNeedsAuth?: boolean;
+  icloudPendingChallenge?: boolean;
   size?: "sm" | "md";
 };
 
@@ -19,10 +20,10 @@ export default function AuthorizeButton({
   appleId,
   icloudAuthorized = false,
   icloudNeedsAuth = true,
+  icloudPendingChallenge = false,
   size = "md",
 }: Props) {
   const { t } = useTranslation();
-  const isConnected = icloudAuthorized && !icloudNeedsAuth;
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -34,13 +35,16 @@ export default function AuthorizeButton({
   const { data: challenge } = useQuery({
     queryKey: ["challenge", userId],
     queryFn: () => api.getPendingChallenge(userId),
-    enabled: open && step === "2fa",
-    refetchInterval: open && step === "2fa" ? 3000 : false,
+    enabled: !!appleId,
+    refetchInterval: 5000,
   });
+
+  const awaiting2fa = icloudPendingChallenge || !!challenge;
+  const isConnected = icloudAuthorized && !icloudNeedsAuth && !awaiting2fa;
 
   const openModal = () => {
     setOpen(true);
-    setStep("password");
+    setStep(awaiting2fa ? "2fa" : "password");
     setPassword("");
     setCode("");
     setDeliveryHint(null);
@@ -114,7 +118,11 @@ export default function AuthorizeButton({
               : "bg-emerald-700 hover:bg-emerald-600"
         }`}
       >
-        {isConnected ? t("buttons.reauthorize") : t("buttons.authorize")}
+        {awaiting2fa
+          ? t("buttons.complete2fa")
+          : isConnected
+            ? t("buttons.reauthorize")
+            : t("buttons.authorize")}
       </button>
 
       {open && (

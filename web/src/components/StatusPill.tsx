@@ -4,6 +4,7 @@ type Variant = "auth" | "activity";
 
 const AUTH_STYLES: Record<string, string> = {
   authorized: "bg-emerald-900/50 text-emerald-400",
+  awaiting_2fa: "bg-violet-900/50 text-violet-400",
   reauth_required: "bg-amber-900/50 text-amber-400",
   expired: "bg-red-900/50 text-red-400",
   not_authorized: "bg-slate-800 text-slate-400",

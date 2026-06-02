@@ -29,14 +29,22 @@ fi
 
 mkdir -p data/downloads data/cookies
 
-echo "Applying database migrations..."
+echo "Applying database migrations (alembic upgrade head)..."
 iclouddownloader db-upgrade
 
-if [ ! -f web/dist/index.html ]; then
-  if command -v npm >/dev/null 2>&1; then
-    echo "Building web UI..."
-    (cd web && npm install && npm run build)
-  else
+if command -v npm >/dev/null 2>&1; then
+  echo "Building web UI..."
+  (
+    cd web
+    if [ -f package-lock.json ]; then
+      npm ci
+    else
+      npm install
+    fi
+    npm run build
+  )
+else
+  if [ ! -f web/dist/index.html ]; then
     echo "Warning: npm not found — Web UI will not load until you run:"
     echo "  cd web && npm install && npm run build"
   fi

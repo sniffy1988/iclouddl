@@ -20,6 +20,7 @@ import {
   secondsToHours,
   syncIntervalPresetLabel,
 } from "../utils/syncSchedule";
+import { canCountIcloud, canSyncIcloud, hasSavedAppleId } from "../utils/icloudActions";
 import { googleSectionDescription, icloudSectionDescription } from "../utils/providerStatus";
 
 function Section({
@@ -192,6 +193,8 @@ export default function UserDetail() {
   const isCountingIcloud = user.activity_status === "counting_icloud";
   const isCountingGoogle = user.activity_status === "counting_google";
   const syncBusy = user.active_syncs_by_scope ?? {};
+  const icloudCountOk = canCountIcloud(user, syncBusy);
+  const icloudSyncOk = canSyncIcloud(user, syncBusy);
   const title =
     user.account_label ||
     user.display_name ||
@@ -279,8 +282,17 @@ export default function UserDetail() {
             authStatus={user.icloud_auth_status}
             accountLabel={user.apple_id}
           />
-          {!user.apple_id && (
+          {!hasSavedAppleId(user) && (
             <p className="text-amber-400 text-sm mb-3">{t("userDetail.setAppleId")}</p>
+          )}
+          {!user.enabled && hasSavedAppleId(user) && (
+            <p className="text-slate-500 text-sm mb-3">{t("userDetail.scheduledSyncOffManualOk")}</p>
+          )}
+          {user.icloud_auth_status === "awaiting_2fa" && (
+            <HelpBox title={t("userDetail.awaiting2faTitle")}>
+              <p className="text-slate-400 text-sm">{t("authorize.step2")}</p>
+              <p className="text-slate-500 text-xs mt-2">{t("authorize.telegramHint")}</p>
+            </HelpBox>
           )}
           {(user.icloud_auth_status === "not_authorized" ||
             user.icloud_auth_status === "reauth_required" ||
@@ -294,13 +306,14 @@ export default function UserDetail() {
             </HelpBox>
           )}
           <div className="flex flex-wrap items-center gap-3 mb-3">
-            {user.apple_id && (
+            {hasSavedAppleId(user) && (
               <>
                 <AuthorizeButton
                   userId={userId}
-                  appleId={user.apple_id}
+                  appleId={user.apple_id!}
                   icloudAuthorized={user.icloud_authorized}
                   icloudNeedsAuth={user.icloud_needs_auth}
+                  icloudPendingChallenge={user.icloud_pending_challenge}
                 />
                 {user.icloud_2fa_at && (
                   <span className="text-slate-400 text-sm">
@@ -324,17 +337,21 @@ export default function UserDetail() {
             <FetchCountButton
               userId={userId}
               source="icloud"
-              disabled={!user.enabled || !user.apple_id || syncBusy.icloud}
+              disabled={!icloudCountOk}
+              title={
+                !icloudCountOk && !hasSavedAppleId(user)
+                  ? t("userDetail.saveAppleIdFirst")
+                  : undefined
+              }
             />
             <SyncNowButton
               userId={userId}
               source="icloud"
-              disabled={
-                !user.enabled ||
-                !user.apple_id ||
-                !user.icloud_authorized ||
-                user.icloud_needs_auth ||
-                syncBusy.icloud
+              disabled={!icloudSyncOk}
+              title={
+                !icloudSyncOk && icloudCountOk
+                  ? t("userDetail.signInIcloudFirst")
+                  : undefined
               }
             />
           </div>
@@ -359,23 +376,19 @@ export default function UserDetail() {
             userId={userId}
             googleAuthorized={user.google_authorized}
             googleNeedsAuth={user.google_needs_auth}
-            disabled={!user.enabled}
           />
           <FieldHelp className="mt-3">{t("userDetail.googleConnectHelp")}</FieldHelp>
           <div className="flex flex-wrap gap-2 mt-4">
             <FetchCountButton
               userId={userId}
               source="google_photos"
-              disabled={!user.enabled || !user.google_authorized || syncBusy.google_photos}
+              disabled={!user.google_authorized || syncBusy.google_photos}
             />
             <SyncNowButton
               userId={userId}
               source="google_photos"
               disabled={
-                !user.enabled ||
-                !user.google_authorized ||
-                user.google_needs_auth ||
-                syncBusy.google_photos
+                user.google_auth_status !== "authorized" || syncBusy.google_photos
               }
             />
           </div>
@@ -547,7 +560,7 @@ export default function UserDetail() {
           <FieldHelp className="mb-3">{t("userDetail.syncAllHelp")}</FieldHelp>
           <SyncNowButton
             userId={userId}
-            disabled={!user.enabled || syncBusy.all}
+            disabled={syncBusy.all || (!icloudSyncOk && user.google_auth_status !== "authorized")}
             label={t("buttons.syncAll")}
           />
         </Section>

@@ -164,6 +164,8 @@ class SyncService:
     def user_to_response(self, user: User) -> dict:
         stats = self.build_photo_count_result(user)
         label = account_label(user)
+        pending_icloud = AuthService(self.db).get_pending_challenge(user.id) is not None
+        icloud_status = AuthService.icloud_auth_status(user, pending_challenge=pending_icloud)
         return {
             "id": user.id,
             "apple_id": user.apple_id,
@@ -176,8 +178,9 @@ class SyncService:
             "next_sync_at": user.next_sync_at,
             "last_sync_at": user.last_sync_at,
             "last_sync_status": user.last_sync_status,
-            "auth_status": AuthService.auth_status_for_user(user),
-            "icloud_auth_status": AuthService.icloud_auth_status(user),
+            "auth_status": icloud_status,
+            "icloud_auth_status": icloud_status,
+            "icloud_pending_challenge": pending_icloud,
             "google_auth_status": GoogleAuthService.google_auth_status(user),
             "activity_status": AuthService.activity_status_for_user(user),
             "icloud_photos_count": user.icloud_photos_count,

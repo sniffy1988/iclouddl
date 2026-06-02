@@ -68,6 +68,7 @@ export interface User {
   icloud_2fa_at: string | null;
   icloud_session_ok_at: string | null;
   icloud_needs_auth: boolean;
+  icloud_pending_challenge?: boolean;
   icloud_authorized: boolean;
   google_authorized: boolean;
   google_needs_auth: boolean;

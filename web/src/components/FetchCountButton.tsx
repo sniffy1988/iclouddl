@@ -7,10 +7,17 @@ type Props = {
   userId: number;
   source: PhotoSource;
   disabled?: boolean;
+  title?: string;
   size?: "sm" | "md";
 };
 
-export default function FetchCountButton({ userId, source, disabled, size = "md" }: Props) {
+export default function FetchCountButton({
+  userId,
+  source,
+  disabled,
+  title,
+  size = "md",
+}: Props) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const toast = useToast();
@@ -34,14 +41,15 @@ export default function FetchCountButton({ userId, source, disabled, size = "md"
 
   const pad = size === "sm" ? "px-2 py-1 text-xs" : "px-4 py-2 text-sm";
   const label = source === "icloud" ? t("buttons.countIcloud") : t("buttons.countGoogle");
-  const title = source === "icloud" ? t("buttons.countIcloudTitle") : t("buttons.countGoogleTitle");
+  const defaultTitle =
+    source === "icloud" ? t("buttons.countIcloudTitle") : t("buttons.countGoogleTitle");
 
   return (
     <button
       type="button"
       onClick={() => fetchCount.mutate()}
       disabled={disabled || fetchCount.isPending}
-      title={title}
+      title={title ?? defaultTitle}
       className={`bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-lg font-medium ${pad}`}
     >
       {fetchCount.isPending ? t("common.starting") : label}

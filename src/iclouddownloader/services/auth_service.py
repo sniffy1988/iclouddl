@@ -44,9 +44,11 @@ class AuthService:
         self.db = db
 
     @staticmethod
-    def icloud_auth_status(user: User) -> str:
+    def icloud_auth_status(user: User, *, pending_challenge: bool = False) -> str:
         if not user.apple_id:
             return "not_linked"
+        if pending_challenge:
+            return "awaiting_2fa"
         if not user.icloud_authenticated_at:
             return "not_authorized"
         if user.icloud_2fa_at and AuthService.days_until_2fa_expires(user) == 0:
@@ -56,9 +58,9 @@ class AuthService:
         return "authorized"
 
     @staticmethod
-    def auth_status_for_user(user: User) -> str:
+    def auth_status_for_user(user: User, *, pending_challenge: bool = False) -> str:
         """Legacy combined status (worst-case across iCloud)."""
-        return AuthService.icloud_auth_status(user)
+        return AuthService.icloud_auth_status(user, pending_challenge=pending_challenge)
 
     @staticmethod
     def activity_status_for_user(user: User) -> str:

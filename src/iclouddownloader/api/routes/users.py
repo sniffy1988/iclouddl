@@ -190,9 +190,6 @@ def fetch_photo_count(
     user = UserService(db).get_user(user_id)
     if not user:
         raise HTTPException(404, "User not found")
-    if not user.enabled:
-        raise HTTPException(400, "User is disabled")
-
     photo_source = PhotoSource(source)
     counting_status = (
         "counting_icloud" if photo_source == PhotoSource.icloud else "counting_google"
@@ -250,9 +247,6 @@ def trigger_sync(
     user = UserService(db).get_user(user_id)
     if not user:
         raise HTTPException(404, "User not found")
-    if not user.enabled:
-        raise HTTPException(400, "User is disabled — enable before syncing")
-
     photo_source = PhotoSource(source) if source else None
     scope = scope_for_source(photo_source)
 

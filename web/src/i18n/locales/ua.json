@@ -125,6 +125,7 @@
   "status": {
     "auth": {
       "authorized": "Авторизован",
+      "awaiting_2fa": "Очікування 2FA",
       "reauth_required": "Потрібна повторна авторизація",
       "expired": "Сесію закінчено",
       "not_authorized": "Не авторизовано",
@@ -160,7 +161,9 @@
     "daysLeft": "Залишилось {{count}} дн."
   },
   "buttons": {
-    "authorize": "Авторизовать",
+    "authorize": "Авторизувати",
+    "reauthorize": "Повторна авторизація iCloud",
+    "complete2fa": "Ввести код 2FA",
     "syncIcloud": "Синхр. iCloud",
     "syncGoogle": "Синхр. Google",
     "syncAll": "Синхр. усе",
@@ -210,7 +213,10 @@
     "icloudTitle": "iCloud",
     "icloudDesc": "Авторизація Apple ID, пароль і 2FA. Count індексує метадані; Sync завантажує файли.",
     "setAppleId": "Вкажіть Apple ID у розділі «Сховище та профіль» нижче для iCloud.",
+    "awaiting2faTitle": "Завершіть двофакторну автентифікацію",
     "beforeSignIn": "Перед входом",
+    "icloudDescAwaiting2fa": "Код надіслано — введіть нижче (або через Telegram /code). Не починайте новий вхід.",
+    "icloudStatus_awaiting_2fa": "Очікування коду 2FA",
     "icloudHelp1": "На iPhone/iPad: Налаштування → Apple ID → iCloud → «Доступ до даних iCloud в інтернеті» має бути увімкнено.",
     "icloudHelp2": "«Розширений захист даних» має бути вимкнено (блокує API фото на сервері).",
     "icloudHelp3": "Використовуйте пароль Apple ID; при 2FA підтвердіть на довіреному пристрої або введіть код у Telegram командою /code 123456 (якщо налаштовано в Налаштуваннях).",
@@ -230,7 +236,10 @@
     "interval": "Интервал",
     "hoursBetween": "Годин між синхронізаціями",
     "minInterval": "Мінімум 5 хвилин (0,083 год)",
-    "scheduledEnabled": "Заплановану синхронізацію увімкнено",
+    "scheduledEnabled": "Фонова синхронізація за розкладом",
+    "scheduledSyncOffManualOk": "Розклад вимкнено — Count і Sync нижче все одно доступні вручну.",
+    "saveAppleIdFirst": "Спочатку збережіть Apple ID у «Сховище та профіль»",
+    "signInIcloudFirst": "Спочатку авторизуйте iCloud (для завантаження потрібна повна сесія)",
     "currentInterval": "Поточний інтервал",
     "nextScheduled": "Наступна синхронізація",
     "lastSync": "Остання синхронізація",

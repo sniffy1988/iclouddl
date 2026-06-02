@@ -213,6 +213,7 @@ export default function Users() {
                         appleId={u.apple_id}
                         icloudAuthorized={u.icloud_authorized}
                         icloudNeedsAuth={u.icloud_needs_auth}
+                        icloudPendingChallenge={u.icloud_pending_challenge}
                         size="sm"
                       />
                     )}

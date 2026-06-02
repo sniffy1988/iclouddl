@@ -8,6 +8,7 @@ type Props = {
   source?: PhotoSource;
   label?: string;
   disabled?: boolean;
+  title?: string;
   size?: "sm" | "md";
   onTriggered?: (result: TriggerSyncResult) => void;
 };
@@ -17,6 +18,7 @@ export default function SyncNowButton({
   source,
   label,
   disabled,
+  title: titleOverride,
   size = "md",
   onTriggered,
 }: Props) {
@@ -57,7 +59,7 @@ export default function SyncNowButton({
       type="button"
       onClick={() => sync.mutate()}
       disabled={disabled || sync.isPending}
-      title={text}
+      title={titleOverride ?? text}
       className={`bg-sky-600 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium ${pad}`}
     >
       {sync.isPending ? t("common.starting") : text}

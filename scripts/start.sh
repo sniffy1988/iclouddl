@@ -23,7 +23,8 @@ fi
 
 mkdir -p data/downloads data/cookies
 
-echo "Building and starting migrate, api, worker (SQLite DB in ./data/)..."
+echo "Building image (web UI + app), running migrations, starting api + worker..."
+echo "  (migrate container applies alembic upgrade head; api/worker wait until it finishes)"
 docker compose up -d --build
 
 WEB_PORT="${WEB_PORT:-8765}"
@@ -43,4 +44,5 @@ echo ""
 echo "Useful commands:"
 echo "  docker compose logs -f api worker"
 echo "  docker compose down"
-echo "  ./scripts/start-local.sh   # run without Docker"
+echo "  docker compose run --rm migrate alembic upgrade head   # migrations only"
+echo "  ./scripts/start-local.sh   # run without Docker (venv, db-upgrade, npm build)"

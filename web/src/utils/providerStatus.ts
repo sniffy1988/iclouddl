@@ -3,6 +3,8 @@ import type { User } from "../api/client";
 
 export function icloudSectionDescription(user: User, t: TFunction): string {
   switch (user.icloud_auth_status) {
+    case "awaiting_2fa":
+      return t("userDetail.icloudDescAwaiting2fa");
     case "authorized":
       return t("userDetail.icloudDescConnected");
     case "not_linked":
