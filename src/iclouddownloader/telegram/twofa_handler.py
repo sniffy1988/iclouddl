@@ -3,11 +3,12 @@ from __future__ import annotations
 import logging
 import re
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from iclouddownloader.services.runtime_settings_service import get_effective_settings
 from iclouddownloader.db.models import AuthChallenge, AuthChallengeStatus
 from iclouddownloader.services.auth_service import AuthService
+from iclouddownloader.services.runtime_settings_service import get_effective_settings
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +22,9 @@ class TwoFAHandler:
         self.settings = get_effective_settings()
 
     def is_allowed_chat(self, chat_id: int, user_id: int | None = None) -> bool:
-        admin = self.settings.telegram_admin_chat_id
-        if str(chat_id) != str(admin):
-            return False
-        allowed = self.settings.telegram_allowed_ids
-        if allowed and user_id is not None and user_id not in allowed:
-            return False
-        return True
+        return bool(
+            self.settings.telegram_enabled and (self.settings.telegram_bot_token or "").strip()
+        )
 
     def handle_message(self, chat_id: int, text: str, from_user_id: int | None = None) -> str | None:
         if not self.is_allowed_chat(chat_id, from_user_id):
@@ -38,8 +35,6 @@ class TwoFAHandler:
             return None
 
         code = match.group(1)
-        from sqlalchemy import select
-
         challenge = self.db.scalar(
             select(AuthChallenge)
             .where(AuthChallenge.status == AuthChallengeStatus.pending)

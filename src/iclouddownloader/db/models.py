@@ -223,7 +223,20 @@ class RuntimeSettings(Base):
     admin_password_hash: Mapped[str] = mapped_column(String(256), default="")
     google_oauth_client_id: Mapped[str] = mapped_column(String(512), default="")
     google_oauth_client_secret: Mapped[str] = mapped_column(String(512), default="")
+    debug_logging_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class AppLog(Base):
+    __tablename__ = "app_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    level: Mapped[str] = mapped_column(String(16), index=True)
+    logger_name: Mapped[str] = mapped_column(String(255))
+    message: Mapped[str] = mapped_column(Text)
+    exception: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str] = mapped_column(String(32), default="app")
 
 
 class AdminSession(Base):

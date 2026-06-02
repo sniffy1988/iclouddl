@@ -97,8 +97,6 @@ class RuntimeSettingsService:
             "telegram_enabled": row.telegram_enabled,
             "telegram_bot_token_set": bool(row.telegram_bot_token),
             "telegram_bot_token_masked": _mask_token(row.telegram_bot_token),
-            "telegram_admin_chat_id": row.telegram_admin_chat_id or "",
-            "telegram_allowed_user_ids": row.telegram_allowed_user_ids or "",
             "download_path_template": row.download_path_template
             or env.download_path_template,
             "default_sync_interval_seconds": row.default_sync_interval_seconds,
@@ -117,6 +115,7 @@ class RuntimeSettingsService:
             "web_public_base_url": public_base,
             "google_oauth_redirect_uri": f"{public_base}/api/auth/google/callback",
             "token_encryption_key_set": bool(env.token_encryption_key.strip()),
+            "debug_logging_enabled": row.debug_logging_enabled,
         }
 
     def update(self, data: dict) -> RuntimeSettings:
@@ -124,10 +123,6 @@ class RuntimeSettingsService:
 
         if "telegram_enabled" in data and data["telegram_enabled"] is not None:
             row.telegram_enabled = data["telegram_enabled"]
-        if "telegram_admin_chat_id" in data and data["telegram_admin_chat_id"] is not None:
-            row.telegram_admin_chat_id = data["telegram_admin_chat_id"].strip()
-        if "telegram_allowed_user_ids" in data and data["telegram_allowed_user_ids"] is not None:
-            row.telegram_allowed_user_ids = data["telegram_allowed_user_ids"].strip()
         if "telegram_bot_token" in data and data["telegram_bot_token"]:
             token = data["telegram_bot_token"].strip()
             if token and not token.startswith("••••"):
@@ -160,10 +155,15 @@ class RuntimeSettingsService:
             secret = str(data["google_oauth_client_secret"]).strip()
             if secret and not secret.startswith("••••"):
                 row.google_oauth_client_secret = secret
+        if "debug_logging_enabled" in data and data["debug_logging_enabled"] is not None:
+            row.debug_logging_enabled = bool(data["debug_logging_enabled"])
 
         self.db.commit()
         self.db.refresh(row)
         get_effective_settings.cache_clear()
+        from iclouddownloader.logging_setup import configure_logging
+
+        configure_logging(force=True)
         return row
 
 
@@ -188,6 +188,7 @@ def get_effective_settings_from_row(row: RuntimeSettings | None) -> EffectiveSet
             "immich_scan_debounce_seconds": row.immich_scan_debounce_seconds,
             "google_oauth_client_id": row.google_oauth_client_id,
             "google_oauth_client_secret": row.google_oauth_client_secret,
+            "debug_logging_enabled": row.debug_logging_enabled,
         }
     )
     return EffectiveSettings(**merged)

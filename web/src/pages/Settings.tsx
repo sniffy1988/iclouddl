@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import { api, SettingsData } from "../api/client";
 import FieldHelp, { HelpBox } from "../components/FieldHelp";
 import { useToast } from "../components/ToastProvider";
+import { setDebugLoggingEnabled } from "../utils/debugLog";
 
 const linkClass = "text-sky-400 hover:underline";
 const monoClass = "font-mono text-slate-300";
@@ -28,8 +30,6 @@ export default function Settings() {
     if (settings) {
       setForm({
         telegram_enabled: settings.telegram_enabled,
-        telegram_admin_chat_id: settings.telegram_admin_chat_id,
-        telegram_allowed_user_ids: settings.telegram_allowed_user_ids,
         download_path_template: settings.download_path_template,
         default_sync_interval_seconds: settings.default_sync_interval_seconds,
         max_concurrent_downloads: settings.max_concurrent_downloads,
@@ -38,6 +38,7 @@ export default function Settings() {
         immich_base_url: settings.immich_base_url,
         immich_scan_debounce_seconds: settings.immich_scan_debounce_seconds,
         google_oauth_client_id: settings.google_oauth_client_id,
+        debug_logging_enabled: settings.debug_logging_enabled,
       });
       setTokenInput("");
       setImmichApiKeyInput("");
@@ -55,7 +56,8 @@ export default function Settings() {
         admin_password: adminPasswordInput || undefined,
         google_oauth_client_secret: googleSecretInput || undefined,
       }),
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      setDebugLoggingEnabled(Boolean(updated.debug_logging_enabled));
       qc.invalidateQueries({ queryKey: ["settings"] });
       setTokenInput("");
       setImmichApiKeyInput("");
@@ -154,33 +156,7 @@ export default function Settings() {
                   }}
                 />
               </li>
-              <li>
-                <Trans
-                  i18nKey="settings.telegramHelp3"
-                  components={{
-                    1: <strong className={strongClass} />,
-                    2: <span className={monoClass} />,
-                    3: <span className="font-mono" />,
-                  }}
-                />
-              </li>
-              <li>
-                <Trans
-                  i18nKey="settings.telegramHelp4"
-                  components={{
-                    1: <strong className={strongClass} />,
-                    2: (
-                      <a
-                        href="https://t.me/userinfobot"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={linkClass}
-                      />
-                    ),
-                    3: <span className="font-mono" />,
-                  }}
-                />
-              </li>
+              <li>{t("settings.telegramHelp3")}</li>
             </ol>
           </HelpBox>
 
@@ -217,41 +193,15 @@ export default function Settings() {
             )}
           </div>
 
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">{t("settings.adminChatId")}</label>
-            <input
-              value={form.telegram_admin_chat_id ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, telegram_admin_chat_id: e.target.value }))
-              }
-              placeholder={t("settings.adminChatIdPlaceholder")}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
-            />
-            <FieldHelp>{t("settings.adminChatIdHelp")}</FieldHelp>
-          </div>
-
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">{t("settings.allowedUserIds")}</label>
-            <input
-              value={form.telegram_allowed_user_ids ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, telegram_allowed_user_ids: e.target.value }))
-              }
-              placeholder={t("settings.allowedUserIdsPlaceholder")}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
-            />
-            <FieldHelp>{t("settings.allowedUserIdsHelp")}</FieldHelp>
-          </div>
-
           <button
             type="button"
             onClick={() => testTg.mutate()}
             disabled={testTg.isPending}
             className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm"
           >
-            {testTg.isPending ? t("common.sending") : t("settings.testDaemonMessage")}
+            {testTg.isPending ? t("common.connecting") : t("settings.testBotToken")}
           </button>
-          <FieldHelp>{t("settings.testDaemonHelp")}</FieldHelp>
+          <FieldHelp>{t("settings.testBotHelp")}</FieldHelp>
         </section>
 
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
@@ -503,6 +453,27 @@ export default function Settings() {
             />
             <FieldHelp>{t("settings.oauthSecretHelp")}</FieldHelp>
           </div>
+        </section>
+
+        <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+          <h3 className="text-lg font-medium text-violet-300">{t("settings.loggingSection")}</h3>
+          <FieldHelp>{t("settings.loggingHelp")}</FieldHelp>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.debug_logging_enabled ?? settings.debug_logging_enabled ?? false}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, debug_logging_enabled: e.target.checked }))
+              }
+              className="rounded"
+            />
+            <span>{t("settings.debugLoggingEnabled")}</span>
+          </label>
+          <p className="text-slate-500 text-sm">
+            <Link to="/logs" className="text-sky-400 hover:underline">
+              {t("settings.viewLogs")}
+            </Link>
+          </p>
         </section>
 
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">

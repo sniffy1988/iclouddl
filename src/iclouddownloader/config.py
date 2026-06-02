@@ -43,6 +43,7 @@ class EffectiveSettings(Settings):
     telegram_allowed_user_ids: str = ""
     google_oauth_client_id: str = ""
     google_oauth_client_secret: str = ""
+    debug_logging_enabled: bool = False
 
     @property
     def telegram_allowed_ids(self) -> list[int]:

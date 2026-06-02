@@ -10,7 +10,7 @@ Multi-user photo backup service for **iCloud Photos** and **Google Photos** with
 - **Download only** — one-way backup; never deletes local files or modifies cloud libraries
 - **SQLite file database** — all state stored in `./data/iclouddownloader.db` (survives restarts; easy to back up)
 - **Daemon** — polls for users due for sync on a configurable interval (default 6 hours)
-- **Telegram** — daemon status to admin chat (user added, sync/count started/finished, etc.) plus optional 2FA bot (`/code 123456`)
+- **Telegram** — optional bot for iCloud 2FA: message your bot with `/code 123456` when prompted
 - **Web UI** — manage users, monitor syncs, submit 2FA codes, live SSE event feed
 
 ## Apple account requirements

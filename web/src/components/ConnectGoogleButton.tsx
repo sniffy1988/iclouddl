@@ -5,13 +5,21 @@ import { useToast } from "./ToastProvider";
 
 type Props = {
   userId: number;
+  googleAuthorized?: boolean;
+  googleNeedsAuth?: boolean;
   disabled?: boolean;
 };
 
-export default function ConnectGoogleButton({ userId, disabled }: Props) {
+export default function ConnectGoogleButton({
+  userId,
+  googleAuthorized = false,
+  googleNeedsAuth = false,
+  disabled,
+}: Props) {
   const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
+  const isConnected = googleAuthorized && !googleNeedsAuth;
 
   const start = useMutation({
     mutationFn: () => api.startGoogleOAuth(userId),
@@ -33,22 +41,36 @@ export default function ConnectGoogleButton({ userId, disabled }: Props) {
 
   return (
     <div className="flex flex-wrap gap-2">
-      <button
-        type="button"
-        onClick={() => start.mutate()}
-        disabled={disabled || start.isPending}
-        className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-medium"
-      >
-        {start.isPending ? t("common.opening") : t("buttons.connectGoogle")}
-      </button>
-      <button
-        type="button"
-        onClick={() => disconnect.mutate()}
-        disabled={disconnect.isPending}
-        className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 px-3 py-2 rounded-lg text-sm"
-      >
-        {t("buttons.disconnect")}
-      </button>
+      {!isConnected && (
+        <button
+          type="button"
+          onClick={() => start.mutate()}
+          disabled={disabled || start.isPending}
+          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-medium"
+        >
+          {start.isPending ? t("common.opening") : t("buttons.connectGoogle")}
+        </button>
+      )}
+      {(isConnected || googleNeedsAuth) && (
+        <button
+          type="button"
+          onClick={() => start.mutate()}
+          disabled={disabled || start.isPending}
+          className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 px-3 py-2 rounded-lg text-sm"
+        >
+          {start.isPending ? t("common.opening") : t("buttons.reconnectGoogle")}
+        </button>
+      )}
+      {(isConnected || googleNeedsAuth) && (
+        <button
+          type="button"
+          onClick={() => disconnect.mutate()}
+          disabled={disconnect.isPending}
+          className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 px-3 py-2 rounded-lg text-sm"
+        >
+          {t("buttons.disconnect")}
+        </button>
+      )}
     </div>
   );
 }

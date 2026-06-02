@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useToast } from "../components/ToastProvider";
 import AuthorizeButton from "../components/AuthorizeButton";
 import { format2faDaysLeft } from "../utils/format2fa";
 import StatusPill from "../components/StatusPill";
 import ConnectGoogleButton from "../components/ConnectGoogleButton";
+import ProviderConnectionBanner from "../components/ProviderConnectionBanner";
 import FieldHelp, { HelpBox } from "../components/FieldHelp";
 import FetchCountButton from "../components/FetchCountButton";
 import SyncNowButton from "../components/SyncNowButton";
@@ -19,6 +20,7 @@ import {
   secondsToHours,
   syncIntervalPresetLabel,
 } from "../utils/syncSchedule";
+import { googleSectionDescription, icloudSectionDescription } from "../utils/providerStatus";
 
 function Section({
   title,
@@ -43,8 +45,10 @@ export default function UserDetail() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const userId = Number(id);
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data: user } = useQuery({
     queryKey: ["user", userId],
@@ -134,6 +138,17 @@ export default function UserDetail() {
     queryFn: api.immichLibraries,
     enabled: immichScanAfterSync,
     retry: false,
+  });
+
+  const deleteUser = useMutation({
+    mutationFn: () => api.deleteUser(userId),
+    onSuccess: () => {
+      toast.success(t("userDetail.userDeleted"));
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["stats"] });
+      navigate("/users", { replace: true });
+    },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const saveSettings = useMutation({
@@ -258,17 +273,26 @@ export default function UserDetail() {
       </div>
 
       <div className="space-y-6 mb-8">
-        <Section title={t("userDetail.icloudTitle")} description={t("userDetail.icloudDesc")}>
+        <Section title={t("userDetail.icloudTitle")} description={icloudSectionDescription(user, t)}>
+          <ProviderConnectionBanner
+            provider="icloud"
+            authStatus={user.icloud_auth_status}
+            accountLabel={user.apple_id}
+          />
           {!user.apple_id && (
             <p className="text-amber-400 text-sm mb-3">{t("userDetail.setAppleId")}</p>
           )}
-          <HelpBox title={t("userDetail.beforeSignIn")}>
+          {(user.icloud_auth_status === "not_authorized" ||
+            user.icloud_auth_status === "reauth_required" ||
+            user.icloud_auth_status === "expired") && (
+            <HelpBox title={t("userDetail.beforeSignIn")}>
             <ul className="list-disc list-inside space-y-1">
               <li>{t("userDetail.icloudHelp1")}</li>
               <li>{t("userDetail.icloudHelp2")}</li>
               <li>{t("userDetail.icloudHelp3")}</li>
             </ul>
-          </HelpBox>
+            </HelpBox>
+          )}
           <div className="flex flex-wrap items-center gap-3 mb-3">
             {user.apple_id && (
               <>
@@ -316,20 +340,27 @@ export default function UserDetail() {
           </div>
         </Section>
 
-        <Section title={t("userDetail.googleTitle")} description={t("userDetail.googleDesc")}>
-          <HelpBox title={t("userDetail.googleChecklist")}>
-            <ol className="list-decimal list-inside space-y-1.5">
-              <li>{t("userDetail.googleStep1")}</li>
-              <li>{t("userDetail.googleStep2")}</li>
-              <li>{t("userDetail.googleStep3")}</li>
-            </ol>
-          </HelpBox>
-          {user.google_account_email && (
-            <p className="text-sm text-slate-400 mb-2">
-              {t("userDetail.connectedAs", { email: user.google_account_email })}
-            </p>
+        <Section title={t("userDetail.googleTitle")} description={googleSectionDescription(user, t)}>
+          <ProviderConnectionBanner
+            provider="google"
+            authStatus={user.google_auth_status}
+            accountLabel={user.google_account_email}
+          />
+          {user.google_auth_status !== "authorized" && (
+            <HelpBox title={t("userDetail.googleChecklist")}>
+              <ol className="list-decimal list-inside space-y-1.5">
+                <li>{t("userDetail.googleStep1")}</li>
+                <li>{t("userDetail.googleStep2")}</li>
+                <li>{t("userDetail.googleStep3")}</li>
+              </ol>
+            </HelpBox>
           )}
-          <ConnectGoogleButton userId={userId} disabled={!user.enabled} />
+          <ConnectGoogleButton
+            userId={userId}
+            googleAuthorized={user.google_authorized}
+            googleNeedsAuth={user.google_needs_auth}
+            disabled={!user.enabled}
+          />
           <FieldHelp className="mt-3">{t("userDetail.googleConnectHelp")}</FieldHelp>
           <div className="flex flex-wrap gap-2 mt-4">
             <FetchCountButton
@@ -594,6 +625,52 @@ export default function UserDetail() {
           ))}
         </tbody>
       </table>
+
+      <section className="mt-10 bg-slate-900 border border-red-900/40 rounded-xl p-5">
+        <h3 className="font-medium text-red-300 mb-2">{t("userDetail.dangerZone")}</h3>
+        <p className="text-slate-500 text-sm mb-4">{t("userDetail.deleteUserHint")}</p>
+        <button
+          type="button"
+          onClick={() => setShowDeleteConfirm(true)}
+          className="bg-red-900/60 hover:bg-red-800 border border-red-700/50 px-4 py-2 rounded-lg text-sm text-red-200"
+        >
+          {t("userDetail.deleteUser")}
+        </button>
+      </section>
+
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            className="bg-slate-900 border border-red-800/60 rounded-xl p-6 w-full max-w-md shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-red-300 mb-2">{t("userDetail.deleteUserTitle")}</h3>
+            <p className="text-slate-400 text-sm mb-6">
+              {t("userDetail.deleteUserConfirm", { name: title })}
+            </p>
+            <div className="flex flex-wrap gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteUser.mutate()}
+                disabled={deleteUser.isPending}
+                className="bg-red-700 hover:bg-red-600 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-medium"
+              >
+                {deleteUser.isPending ? t("userDetail.deletingUser") : t("userDetail.deleteUser")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -199,8 +199,6 @@ class SettingsResponse(BaseModel):
     telegram_enabled: bool
     telegram_bot_token_set: bool = False
     telegram_bot_token_masked: str = ""
-    telegram_admin_chat_id: str = ""
-    telegram_allowed_user_ids: str = ""
     download_path_template: str = "YYYY/MM/DD/{filename}"
     default_sync_interval_seconds: int
     max_concurrent_downloads: int
@@ -218,6 +216,22 @@ class SettingsResponse(BaseModel):
     web_public_base_url: str = "http://localhost:8765"
     google_oauth_redirect_uri: str = ""
     token_encryption_key_set: bool = False
+    debug_logging_enabled: bool = False
+
+
+class AppLogEntry(BaseModel):
+    id: int
+    created_at: str | None
+    level: str
+    logger_name: str
+    message: str
+    exception: str | None = None
+    source: str = "app"
+
+
+class AppLogListResponse(BaseModel):
+    items: list[AppLogEntry]
+    total: int
 
 
 class ImmichTestRequest(BaseModel):
@@ -227,8 +241,6 @@ class ImmichTestRequest(BaseModel):
 class SettingsUpdate(BaseModel):
     telegram_enabled: bool | None = None
     telegram_bot_token: str | None = None
-    telegram_admin_chat_id: str | None = None
-    telegram_allowed_user_ids: str | None = None
     download_path_template: str | None = None
     default_sync_interval_seconds: int | None = Field(default=None, ge=300)
     max_concurrent_downloads: int | None = Field(default=None, ge=1, le=32)
@@ -240,3 +252,4 @@ class SettingsUpdate(BaseModel):
     admin_password: str | None = None
     google_oauth_client_id: str | None = None
     google_oauth_client_secret: str | None = None
+    debug_logging_enabled: bool | None = None

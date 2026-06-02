@@ -7,6 +7,7 @@ const navItems = [
   { to: "/", key: "dashboard" as const },
   { to: "/users", key: "users" as const },
   { to: "/sync-runs", key: "syncRuns" as const },
+  { to: "/logs", key: "logs" as const },
   { to: "/settings", key: "settings" as const },
 ];
 

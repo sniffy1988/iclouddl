@@ -1,6 +1,11 @@
+import { debugLog, debugWarn } from "../utils/debugLog";
+
 const API = "/api";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const method = options?.method ?? "GET";
+  const started = performance.now();
+  debugLog("→", method, path);
   const res = await fetch(`${API}${path}`, {
     ...options,
     credentials: "include",
@@ -9,6 +14,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       ...options?.headers,
     },
   });
+  debugLog("←", method, path, res.status, `${(performance.now() - started).toFixed(0)}ms`);
   if (res.status === 401) {
     window.location.href = "/login";
     throw new Error("Unauthorized");
@@ -22,10 +28,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         : Array.isArray(detail)
           ? detail.map((d) => d.msg).join(", ")
           : res.statusText;
+    debugWarn("API error", method, path, msg);
     throw new Error(msg);
   }
   if (res.status === 204) return undefined as T;
-  return res.json();
+  return res.json() as Promise<T>;
 }
 
 export type PhotoSource = "icloud" | "google_photos";
@@ -138,8 +145,6 @@ export interface SettingsData {
   telegram_enabled: boolean;
   telegram_bot_token_set: boolean;
   telegram_bot_token_masked: string;
-  telegram_admin_chat_id: string;
-  telegram_allowed_user_ids: string;
   download_path_template: string;
   default_sync_interval_seconds: number;
   max_concurrent_downloads: number;
@@ -157,6 +162,22 @@ export interface SettingsData {
   web_public_base_url?: string;
   google_oauth_redirect_uri?: string;
   token_encryption_key_set?: boolean;
+  debug_logging_enabled?: boolean;
+}
+
+export interface AppLogEntry {
+  id: number;
+  created_at: string | null;
+  level: string;
+  logger_name: string;
+  message: string;
+  exception: string | null;
+  source: string;
+}
+
+export interface AppLogListResponse {
+  items: AppLogEntry[];
+  total: number;
 }
 
 export interface DashboardStats {
@@ -263,4 +284,15 @@ export const api = {
     }),
   immichLibraries: () =>
     request<{ libraries: ImmichLibrary[] }>("/immich/libraries"),
+  logs: (params?: { limit?: number; offset?: number; level?: string; search?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.offset) q.set("offset", String(params.offset));
+    if (params?.level) q.set("level", params.level);
+    if (params?.search) q.set("search", params.search);
+    const qs = q.toString();
+    return request<AppLogListResponse>(`/logs${qs ? `?${qs}` : ""}`);
+  },
+  clearLogs: () =>
+    request<{ ok: boolean; deleted: number }>("/logs", { method: "DELETE" }),
 };

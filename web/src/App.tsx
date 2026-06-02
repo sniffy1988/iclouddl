@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes } from "react-router-dom";
+import DebugLoggingSync from "./components/DebugLoggingSync";
 import Layout from "./components/Layout";
 import { ToastProvider } from "./components/ToastProvider";
 import Dashboard from "./pages/Dashboard";
+import Logs from "./pages/Logs";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
 import SyncRuns from "./pages/SyncRuns";
@@ -32,12 +34,14 @@ export default function App() {
           path="/*"
           element={
             <Protected>
+              <DebugLoggingSync />
               <Layout>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/users" element={<Users />} />
                   <Route path="/users/:id" element={<UserDetail />} />
                   <Route path="/sync-runs" element={<SyncRuns />} />
+                  <Route path="/logs" element={<Logs />} />
                   <Route path="/settings" element={<Settings />} />
                 </Routes>
               </Layout>

@@ -18,8 +18,12 @@ from iclouddownloader.notifications import AppNotifier
 
 
 @click.group()
-def main():
+@click.pass_context
+def main(ctx):
     """iCloud Photo Downloader — multi-user backup with PostgreSQL tracking."""
+    from iclouddownloader.logging_setup import configure_logging
+
+    configure_logging()
 
 
 @main.command("db-init")

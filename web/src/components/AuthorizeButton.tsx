@@ -22,9 +22,7 @@ export default function AuthorizeButton({
   size = "md",
 }: Props) {
   const { t } = useTranslation();
-  if (icloudAuthorized && !icloudNeedsAuth) {
-    return null;
-  }
+  const isConnected = icloudAuthorized && !icloudNeedsAuth;
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -109,12 +107,14 @@ export default function AuthorizeButton({
         onClick={openModal}
         title={t("authorize.authorizeTitle")}
         className={`rounded-lg font-medium disabled:opacity-50 ${pad} ${
-          icloudNeedsAuth
-            ? "bg-amber-600 hover:bg-amber-500"
-            : "bg-emerald-700 hover:bg-emerald-600"
+          isConnected
+            ? "bg-slate-700 hover:bg-slate-600"
+            : icloudNeedsAuth
+              ? "bg-amber-600 hover:bg-amber-500"
+              : "bg-emerald-700 hover:bg-emerald-600"
         }`}
       >
-        {t("buttons.authorize")}
+        {isConnected ? t("buttons.reauthorize") : t("buttons.authorize")}
       </button>
 
       {open && (

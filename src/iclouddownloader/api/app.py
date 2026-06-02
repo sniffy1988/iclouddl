@@ -1,15 +1,27 @@
+import logging
+import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from iclouddownloader.api.routes import auth, google_auth, photos, settings, sync, users
+from iclouddownloader.api.routes import auth, google_auth, logs, photos, settings, sync, users
+from iclouddownloader.logging_setup import configure_logging, is_debug_logging_enabled
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    configure_logging(force=True)
+    yield
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="iCloud Photo Downloader", version="0.1.0")
+    app = FastAPI(title="iCloud Photo Downloader", version="0.1.0", lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,
@@ -19,16 +31,33 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    @app.middleware("http")
+    async def request_logging_middleware(request: Request, call_next):
+        if not is_debug_logging_enabled():
+            return await call_next(request)
+        start = time.perf_counter()
+        response = await call_next(request)
+        ms = (time.perf_counter() - start) * 1000
+        logger.info(
+            "%s %s -> %s (%.0f ms)",
+            request.method,
+            request.url.path,
+            response.status_code,
+            ms,
+        )
+        return response
+
     app.include_router(auth.router)
     app.include_router(users.router)
     app.include_router(google_auth.router)
     app.include_router(photos.router)
     app.include_router(sync.router)
     app.include_router(settings.router)
+    app.include_router(logs.router)
 
     @app.get("/api/health")
     def health():
-        return {"status": "ok"}
+        return {"status": "ok", "debug_logging_enabled": is_debug_logging_enabled()}
 
     web_dist = Path(__file__).resolve().parents[3] / "web" / "dist"
     if web_dist.exists():
