@@ -182,9 +182,9 @@ pytest
 | Workflow | Trigger | What it does |
 |----------|---------|----------------|
 | [CI](.github/workflows/ci.yml) | Push / PR to `main` | `pytest`, web build, Docker build + health check |
-| [Deploy](.github/workflows/deploy.yml) | Push to `main`, manual | Build image → **GHCR** → SSH `docker compose` on your server |
+| [Docker image](.github/workflows/docker-image.yml) | Push to `main` | Build and push to **GHCR** — pull on your servers |
 
-Setup: create the repo, add deploy secrets, and follow [deploy/README.md](deploy/README.md).
+Pull and run: [deploy/README.md](deploy/README.md).
 
 ```bash
 git remote add origin https://github.com/sniffy1988/iclouddl.git
