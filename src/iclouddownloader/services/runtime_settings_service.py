@@ -61,6 +61,8 @@ class RuntimeSettingsService:
             immich_base_url=env.immich_base_url,
             immich_api_key=env.immich_api_key,
             immich_scan_debounce_seconds=env.immich_scan_debounce_seconds,
+            google_oauth_client_id=os.getenv("GOOGLE_OAUTH_CLIENT_ID", "").strip(),
+            google_oauth_client_secret=os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "").strip(),
         )
         self.db.add(row)
         self.db.commit()
@@ -90,6 +92,7 @@ class RuntimeSettingsService:
     def to_api_dict(self) -> dict:
         row = self.get_row()
         env = get_settings()
+        public_base = env.web_public_base_url.rstrip("/")
         return {
             "telegram_enabled": row.telegram_enabled,
             "telegram_bot_token_set": bool(row.telegram_bot_token),
@@ -108,6 +111,12 @@ class RuntimeSettingsService:
             "immich_api_key_masked": _mask_token(row.immich_api_key),
             "immich_scan_debounce_seconds": row.immich_scan_debounce_seconds,
             "admin_password_set": bool(row.admin_password_hash),
+            "google_oauth_client_id": row.google_oauth_client_id or "",
+            "google_oauth_client_secret_set": bool(row.google_oauth_client_secret),
+            "google_oauth_client_secret_masked": _mask_token(row.google_oauth_client_secret),
+            "web_public_base_url": public_base,
+            "google_oauth_redirect_uri": f"{public_base}/api/auth/google/callback",
+            "token_encryption_key_set": bool(env.token_encryption_key.strip()),
         }
 
     def update(self, data: dict) -> RuntimeSettings:
@@ -145,6 +154,12 @@ class RuntimeSettingsService:
             pwd = str(data["admin_password"]).strip()
             if pwd and not pwd.startswith("••••"):
                 set_admin_password(self.db, row, pwd)
+        if "google_oauth_client_id" in data and data["google_oauth_client_id"] is not None:
+            row.google_oauth_client_id = str(data["google_oauth_client_id"]).strip()
+        if "google_oauth_client_secret" in data and data["google_oauth_client_secret"]:
+            secret = str(data["google_oauth_client_secret"]).strip()
+            if secret and not secret.startswith("••••"):
+                row.google_oauth_client_secret = secret
 
         self.db.commit()
         self.db.refresh(row)
@@ -171,6 +186,8 @@ def get_effective_settings_from_row(row: RuntimeSettings | None) -> EffectiveSet
             "immich_base_url": row.immich_base_url,
             "immich_api_key": row.immich_api_key,
             "immich_scan_debounce_seconds": row.immich_scan_debounce_seconds,
+            "google_oauth_client_id": row.google_oauth_client_id,
+            "google_oauth_client_secret": row.google_oauth_client_secret,
         }
     )
     return EffectiveSettings(**merged)

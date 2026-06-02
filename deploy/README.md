@@ -9,6 +9,15 @@ ghcr.io/sniffy1988/iclouddl:latest
 ghcr.io/sniffy1988/iclouddl:<git-sha>
 ```
 
+Published as a **multi-architecture** manifest. Docker pulls the matching image automatically:
+
+| Platform | Typical hardware |
+|----------|------------------|
+| `linux/amd64` | Intel/AMD PCs and VPS |
+| `linux/arm64` | Apple Silicon Macs, AWS Graviton, Raspberry Pi 4/5 (64-bit OS) |
+
+Check after pull: `docker image inspect ghcr.io/sniffy1988/iclouddl:latest --format '{{.Os}}/{{.Architecture}}'`
+
 Repository: https://github.com/sniffy1988/iclouddl
 
 ## One-time server setup
@@ -61,6 +70,6 @@ Configure Immich in **Settings** (URL, API key, test connection). Per Apple ID, 
 | Workflow | Trigger | What it does |
 |----------|---------|----------------|
 | [CI](../.github/workflows/ci.yml) | Push / PR | Tests + local Docker smoke test |
-| [Docker image](../.github/workflows/docker-image.yml) | Push to `main` | Build and push to GHCR only |
+| [Docker image](../.github/workflows/docker-image.yml) | Push to `main` | Multi-arch build (`amd64` + `arm64`) and push to GHCR |
 
 No SSH deploy from GitHub — you control when each server updates.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -19,7 +20,7 @@ class AuthStatusResponse(BaseModel):
 
 
 class UserCreate(BaseModel):
-    apple_id: str
+    apple_id: str | None = None
     display_name: str | None = None
     download_dir: str | None = None
     sync_interval_seconds: int | None = None
@@ -28,6 +29,7 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     display_name: str | None = None
+    apple_id: str | None = None
     download_dir: str | None = Field(default=None, min_length=1, max_length=1024)
     sync_interval_seconds: int | None = Field(default=None, ge=300, le=2_592_000)
     enabled: bool | None = None
@@ -39,8 +41,9 @@ class UserUpdate(BaseModel):
 
 class UserResponse(BaseModel):
     id: int
-    apple_id: str
+    apple_id: str | None = None
     display_name: str | None
+    account_label: str = ""
     download_dir: str
     sync_interval_seconds: int
     enabled: bool
@@ -49,16 +52,30 @@ class UserResponse(BaseModel):
     last_sync_at: datetime | None
     last_sync_status: str | None
     auth_status: str = "not_authorized"
+    icloud_auth_status: str = "not_linked"
+    google_auth_status: str = "not_linked"
     activity_status: str = "idle"
     icloud_photos_count: int | None = None
     icloud_photos_count_at: datetime | None = None
+    google_photos_count: int | None = None
+    google_photos_count_at: datetime | None = None
+    google_account_email: str | None = None
     downloaded_count: int = 0
+    icloud_downloaded_count: int = 0
+    google_downloaded_count: int = 0
+    icloud_remaining: int | None = None
+    google_remaining: int | None = None
     remaining_to_download: int | None = None
     icloud_authenticated_at: datetime | None = None
     icloud_2fa_at: datetime | None = None
     icloud_session_ok_at: datetime | None = None
     icloud_needs_auth: bool = True
     icloud_authorized: bool = False
+    google_authorized: bool = False
+    google_needs_auth: bool = True
+    google_authenticated_at: datetime | None = None
+    linked_providers: list[str] = []
+    active_syncs_by_scope: dict[str, bool] = {}
     icloud_2fa_expires_at: datetime | None = None
     days_until_2fa_expires: int | None = None
     immich_library_id: str | None = None
@@ -72,6 +89,7 @@ class UserResponse(BaseModel):
 class SyncRunResponse(BaseModel):
     id: int
     user_id: int
+    scope: str = "all"
     started_at: datetime
     finished_at: datetime | None
     status: str
@@ -87,7 +105,8 @@ class SyncRunResponse(BaseModel):
 class PhotoResponse(BaseModel):
     id: int
     user_id: int
-    icloud_asset_id: str
+    source: str
+    provider_asset_id: str
     filename: str
     local_path: str | None
     file_size: int | None
@@ -131,10 +150,17 @@ class AuthChallengeResponse(BaseModel):
 
 class PhotoCountResponse(BaseModel):
     user_id: int
+    source: str | None = None
     icloud_photos_count: int | None
     icloud_photos_count_at: datetime | None
+    google_photos_count: int | None = None
+    google_photos_count_at: datetime | None = None
     downloaded_count: int
     tracked_count: int
+    icloud_downloaded_count: int = 0
+    google_downloaded_count: int = 0
+    icloud_remaining: int | None = None
+    google_remaining: int | None = None
     remaining_to_download: int | None = None
 
 
@@ -142,6 +168,7 @@ class FetchCountResponse(BaseModel):
     ok: bool
     message: str
     user_id: int
+    source: str | None = None
     already_running: bool = False
 
 
@@ -149,6 +176,8 @@ class TriggerSyncResponse(BaseModel):
     ok: bool
     message: str
     user_id: int
+    source: str | None = None
+    scope: str | None = None
     sync_run_id: int | None = None
     already_running: bool = False
 
@@ -161,6 +190,9 @@ class DashboardStats(BaseModel):
     active_syncs: int
     failed_syncs: int
     users_due_for_sync: int
+
+
+PhotoSourceParam = Literal["icloud", "google_photos"]
 
 
 class SettingsResponse(BaseModel):
@@ -180,6 +212,12 @@ class SettingsResponse(BaseModel):
     immich_api_key_masked: str = ""
     immich_scan_debounce_seconds: int = 120
     admin_password_set: bool = False
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret_set: bool = False
+    google_oauth_client_secret_masked: str = ""
+    web_public_base_url: str = "http://localhost:8765"
+    google_oauth_redirect_uri: str = ""
+    token_encryption_key_set: bool = False
 
 
 class ImmichTestRequest(BaseModel):
@@ -200,3 +238,5 @@ class SettingsUpdate(BaseModel):
     immich_api_key: str | None = None
     immich_scan_debounce_seconds: int | None = Field(default=None, ge=0, le=3600)
     admin_password: str | None = None
+    google_oauth_client_id: str | None = None
+    google_oauth_client_secret: str | None = None

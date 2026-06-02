@@ -17,7 +17,9 @@ from iclouddownloader.api.schemas import (
     UserUpdate,
 )
 from iclouddownloader.services.sync_service import SyncInProgressError
-from iclouddownloader.db.models import AuthChallengeStatus
+from iclouddownloader.db.models import AuthChallengeStatus, PhotoSource
+from iclouddownloader.providers.base import scope_for_source
+from iclouddownloader.api.schemas import PhotoSourceParam
 from iclouddownloader.services.auth_service import AuthService
 from iclouddownloader.services.sync_service import SyncService
 from iclouddownloader.services.user_service import UserService
@@ -41,8 +43,10 @@ def create_user(
     _: None = Depends(require_auth),
 ):
     svc = UserService(db)
-    if svc.get_by_apple_id(body.apple_id):
+    if body.apple_id and svc.get_by_apple_id(body.apple_id):
         raise HTTPException(400, "Apple ID already registered")
+    if not body.apple_id and not body.display_name:
+        raise HTTPException(400, "Provide apple_id and/or display_name")
     user = svc.create_user(**body.model_dump())
     notifier = AppNotifier()
     notifier.user_added(user)
@@ -178,6 +182,7 @@ def get_photo_counts(user_id: int, db: Session = Depends(get_db), _: None = Depe
 def fetch_photo_count(
     user_id: int,
     background_tasks: BackgroundTasks,
+    source: PhotoSourceParam = "icloud",
     db: Session = Depends(get_db),
     _: None = Depends(require_auth),
 ):
@@ -188,43 +193,56 @@ def fetch_photo_count(
     if not user.enabled:
         raise HTTPException(400, "User is disabled")
 
-    if user.last_sync_status == "counting":
+    photo_source = PhotoSource(source)
+    counting_status = (
+        "counting_icloud" if photo_source == PhotoSource.icloud else "counting_google"
+    )
+    if user.last_sync_status in ("counting", counting_status):
         return FetchCountResponse(
             ok=False,
             message="Photo count already in progress",
             user_id=user_id,
+            source=source,
             already_running=True,
         )
 
     try:
-        sync_svc.ensure_can_start_sync(user_id)
-    except SyncInProgressError:
+        sync_svc.ensure_can_start_sync(user_id, requested=photo_source)
+    except SyncInProgressError as e:
         return FetchCountResponse(
             ok=False,
-            message="Sync is in progress — wait for it to finish before counting",
+            message=f"Sync in progress (scope={e.scope}) — wait before counting",
             user_id=user_id,
+            source=source,
             already_running=True,
         )
 
     notifier = AppNotifier()
 
-    def _run():
+    def _run(src: PhotoSource = photo_source):
         from iclouddownloader.db.session import get_session_factory
 
         sdb = get_session_factory()()
         try:
-            SyncService(sdb, notifier=notifier).fetch_icloud_photo_count(user_id)
+            SyncService(sdb, notifier=notifier).fetch_photo_count(user_id, src)
         finally:
             sdb.close()
 
     background_tasks.add_task(_run)
-    return FetchCountResponse(ok=True, message="Fetching photo count from iCloud", user_id=user_id)
+    label = "iCloud" if photo_source == PhotoSource.icloud else "Google Photos"
+    return FetchCountResponse(
+        ok=True,
+        message=f"Fetching photo count from {label}",
+        user_id=user_id,
+        source=source,
+    )
 
 
 @router.post("/{user_id}/sync", response_model=TriggerSyncResponse)
 def trigger_sync(
     user_id: int,
     background_tasks: BackgroundTasks,
+    source: PhotoSourceParam | None = None,
     db: Session = Depends(get_db),
     _: None = Depends(require_auth),
 ):
@@ -235,13 +253,18 @@ def trigger_sync(
     if not user.enabled:
         raise HTTPException(400, "User is disabled — enable before syncing")
 
+    photo_source = PhotoSource(source) if source else None
+    scope = scope_for_source(photo_source)
+
     try:
-        sync_svc.ensure_can_start_sync(user_id)
+        sync_svc.ensure_can_start_sync(user_id, requested=photo_source)
     except SyncInProgressError as e:
         return TriggerSyncResponse(
             ok=False,
-            message="Sync already in progress for this user",
+            message=f"Sync already in progress (scope={e.scope})",
             user_id=user_id,
+            source=source,
+            scope=e.scope,
             sync_run_id=e.sync_run_id,
             already_running=True,
         )
@@ -249,12 +272,12 @@ def trigger_sync(
     sync_svc.mark_sync_queued(user_id)
     notifier = AppNotifier()
 
-    def _run():
+    def _run(src: PhotoSource | None = photo_source):
         from iclouddownloader.db.session import get_session_factory
 
         sdb = get_session_factory()()
         try:
-            SyncService(sdb, notifier=notifier).trigger_sync(user_id)
+            SyncService(sdb, notifier=notifier).trigger_sync(user_id, source=src)
         finally:
             sdb.close()
 
@@ -263,6 +286,8 @@ def trigger_sync(
         ok=True,
         message="Sync job started",
         user_id=user_id,
+        source=source,
+        scope=scope.value,
     )
 
 

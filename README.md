@@ -1,11 +1,13 @@
 # iCloud Photo Downloader
 
-Multi-user iCloud Photos backup service with a file-based SQLite database, scheduled sync daemon, Telegram alerts, and a web admin UI.
+Multi-user photo backup service for **iCloud Photos** and **Google Photos** with a SQLite database, scheduled sync daemon, Telegram alerts, and a web admin UI.
 
 ## Features
 
-- **Unlimited users** — each Apple ID has its own download directory and sync schedule
-- **Download only** — one-way backup; never deletes local files or modifies iCloud
+- **Dual sources** — one user profile can link iCloud and Google Photos into the same download folder
+- **Per-provider actions** — separate Count / Sync iCloud and Count / Sync Google; optional **Sync all** (parallel)
+- **Unlimited users** — each profile has its own download directory and sync schedule
+- **Download only** — one-way backup; never deletes local files or modifies cloud libraries
 - **SQLite file database** — all state stored in `./data/iclouddownloader.db` (survives restarts; easy to back up)
 - **Daemon** — polls for users due for sync on a configurable interval (default 6 hours)
 - **Telegram** — daemon status to admin chat (user added, sync/count started/finished, etc.) plus optional 2FA bot (`/code 123456`)
@@ -16,6 +18,17 @@ Multi-user iCloud Photos backup service with a file-based SQLite database, sched
 1. Enable **Settings → Apple ID → iCloud → Access iCloud Data on the Web** on your iPhone/iPad
 2. **Disable Advanced Data Protection** — it blocks server-side photo API access
 3. Use an app-specific password or account password with 2FA for initial login
+
+## Google Photos setup
+
+1. Create a [Google Cloud](https://console.cloud.google.com/) project and enable **Photos Library API**
+2. Create an **OAuth 2.0 Web client** with redirect URI: `{WEB_PUBLIC_BASE_URL}/api/auth/google/callback` (e.g. `http://localhost:8765/api/auth/google/callback`)
+3. Set in **Settings → Google Photos OAuth** (stored in DB): client ID and client secret
+4. Set in `.env`:
+   - `WEB_PUBLIC_BASE_URL` — must match the host users open in the browser
+   - `TOKEN_ENCRYPTION_KEY` — Fernet key for refresh tokens at rest (`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`)
+5. On a user page, click **Connect Google Photos** and complete OAuth
+6. For users with **both** sources, use a path template with `{source}` (e.g. `{source}/YYYY/MM/DD/{filename}`) in Settings
 
 ## Quick start (one command)
 
@@ -64,6 +77,22 @@ docker compose exec api iclouddownloader auth login --apple-id user@icloud.com
 
 # Add user via CLI
 docker compose exec api iclouddownloader user add --apple-id user@icloud.com
+```
+
+### Multi-architecture image (GHCR)
+
+CI builds and pushes one manifest tag for **amd64** and **arm64**. On any server or Mac:
+
+```bash
+docker pull ghcr.io/sniffy1988/iclouddl:latest
+```
+
+Local multi-arch build (optional):
+
+```bash
+docker buildx create --use --name multi 2>/dev/null || docker buildx use multi
+docker buildx build --platform linux/amd64,linux/arm64 -t iclouddownloader:local --load .
+# --load only works for a single platform; omit --load and use --push to publish both.
 ```
 
 ### Development with Docker
@@ -183,7 +212,7 @@ pytest
 | Workflow | Trigger | What it does |
 |----------|---------|----------------|
 | [CI](.github/workflows/ci.yml) | Push / PR to `main` | `pytest`, web build, Docker build + health check |
-| [Docker image](.github/workflows/docker-image.yml) | Push to `main` | Build and push to **GHCR** — pull on your servers |
+| [Docker image](.github/workflows/docker-image.yml) | Push to `main` | Multi-arch image (`linux/amd64`, `linux/arm64`) pushed to **GHCR** |
 
 Pull and run: [deploy/README.md](deploy/README.md).
 

@@ -44,8 +44,9 @@ class AuthService:
         self.db = db
 
     @staticmethod
-    def auth_status_for_user(user: User) -> str:
-        """UI auth status: not_authorized | authorized | reauth_required | expired."""
+    def icloud_auth_status(user: User) -> str:
+        if not user.apple_id:
+            return "not_linked"
         if not user.icloud_authenticated_at:
             return "not_authorized"
         if user.icloud_2fa_at and AuthService.days_until_2fa_expires(user) == 0:
@@ -53,6 +54,11 @@ class AuthService:
         if user.icloud_needs_auth or not AuthService.is_authorized(user):
             return "reauth_required"
         return "authorized"
+
+    @staticmethod
+    def auth_status_for_user(user: User) -> str:
+        """Legacy combined status (worst-case across iCloud)."""
+        return AuthService.icloud_auth_status(user)
 
     @staticmethod
     def activity_status_for_user(user: User) -> str:
@@ -89,6 +95,8 @@ class AuthService:
 
     @staticmethod
     def is_authorized(user: User) -> bool:
+        if not user.apple_id:
+            return False
         if user.icloud_needs_auth or not user.icloud_authenticated_at:
             return False
         expires = AuthService.icloud_2fa_expires_at(user)

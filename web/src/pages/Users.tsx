@@ -4,9 +4,7 @@ import { Link } from "react-router-dom";
 import { api, User } from "../api/client";
 import AuthorizeButton from "../components/AuthorizeButton";
 import { format2faDaysLeft } from "../utils/format2fa";
-import FetchCountButton from "../components/FetchCountButton";
 import StatusPill from "../components/StatusPill";
-import SyncNowButton from "../components/SyncNowButton";
 import { formatSyncInterval } from "../utils/syncSchedule";
 import { useToast } from "../components/ToastProvider";
 
@@ -23,15 +21,24 @@ export default function Users() {
 
   const [showAdd, setShowAdd] = useState(false);
   const [appleId, setAppleId] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [fetchOnCreate, setFetchOnCreate] = useState(true);
 
   const create = useMutation({
-    mutationFn: () => api.createUser({ apple_id: appleId }, fetchOnCreate),
+    mutationFn: () =>
+      api.createUser(
+        {
+          apple_id: appleId.trim() || undefined,
+          display_name: displayName.trim() || undefined,
+        },
+        fetchOnCreate && !!appleId.trim()
+      ),
     onSuccess: (user) => {
       qc.invalidateQueries({ queryKey: ["users"] });
       setShowAdd(false);
       setAppleId("");
-      toast.success(`User ${user.apple_id} added`);
+      setDisplayName("");
+      toast.success(`User ${user.account_label || user.id} added`);
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -69,23 +76,33 @@ export default function Users() {
       </div>
 
       <p className="text-slate-500 text-sm mb-6">
-        Authorize signs in to iCloud (password + 2FA). Fetch count scans iCloud and saves photo
-        metadata to the database (slow for large libraries, no download). Sync now downloads
-        files.
+        Each user can link iCloud and/or Google Photos. Use per-provider Count and Sync on the user
+        detail page. For dual-source downloads, set path template to include {"{source}"} (e.g.{" "}
+        {"{source}/YYYY/MM/DD/{filename}"}).
       </p>
 
       {showAdd && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-6 space-y-3">
-          <div className="flex gap-3">
+          <p className="text-xs text-slate-500">
+            Provide a display name and/or Apple ID. Google Photos can be linked later on the user
+            page. At least one label is required.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Display name (optional)"
+              className="flex-1 min-w-[140px] bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
+            />
             <input
               value={appleId}
               onChange={(e) => setAppleId(e.target.value)}
-              placeholder="apple@icloud.com"
-              className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
+              placeholder="Apple ID (optional)"
+              className="flex-1 min-w-[180px] bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
             />
             <button
               onClick={() => create.mutate()}
-              disabled={!appleId || create.isPending}
+              disabled={(!appleId.trim() && !displayName.trim()) || create.isPending}
               className="bg-sky-600 px-4 py-2 rounded-lg text-sm"
             >
               {create.isPending ? "Adding…" : "Create"}
@@ -110,7 +127,7 @@ export default function Users() {
         <table className="w-full text-sm min-w-[900px]">
           <thead>
             <tr className="text-slate-500 border-b border-slate-800">
-              <th className="text-left py-2 pr-4">Apple ID</th>
+              <th className="text-left py-2 pr-4">User</th>
               <th className="text-left py-2 pr-4">Auth</th>
               <th className="text-left py-2 pr-4">Activity</th>
               <th className="text-left py-2 pr-4">2FA left</th>
@@ -131,7 +148,7 @@ export default function Users() {
                     className="text-sky-400 hover:underline font-medium"
                     title="Manage user"
                   >
-                    {u.apple_id}
+                    {u.account_label || u.apple_id || u.google_account_email || `#${u.id}`}
                   </Link>
                   {!u.enabled && (
                     <span className="ml-2 text-xs text-slate-500">(disabled)</span>
@@ -191,20 +208,21 @@ export default function Users() {
                 </td>
                 <td className="py-3">
                   <div className="flex flex-wrap gap-2">
-                    <AuthorizeButton
-                      userId={u.id}
-                      appleId={u.apple_id}
-                      icloudAuthorized={u.icloud_authorized}
-                      icloudNeedsAuth={u.icloud_needs_auth}
-                      size="sm"
-                    />
-                    <FetchCountButton userId={u.id} disabled={!u.enabled} size="sm" />
-                    <SyncNowButton
-                      userId={u.id}
-                      appleId={u.apple_id}
-                      disabled={!u.enabled}
-                      size="sm"
-                    />
+                    {u.apple_id && (
+                      <AuthorizeButton
+                        userId={u.id}
+                        appleId={u.apple_id}
+                        icloudAuthorized={u.icloud_authorized}
+                        icloudNeedsAuth={u.icloud_needs_auth}
+                        size="sm"
+                      />
+                    )}
+                    <Link
+                      to={`/users/${u.id}`}
+                      className="text-sky-400 hover:underline text-xs px-2 py-1"
+                    >
+                      Manage
+                    </Link>
                   </div>
                 </td>
               </tr>

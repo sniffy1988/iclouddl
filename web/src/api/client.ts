@@ -28,10 +28,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export type PhotoSource = "icloud" | "google_photos";
+
 export interface User {
   id: number;
-  apple_id: string;
+  apple_id: string | null;
   display_name: string | null;
+  account_label?: string;
   download_dir: string;
   sync_interval_seconds: number;
   enabled: boolean;
@@ -40,16 +43,30 @@ export interface User {
   last_sync_at: string | null;
   last_sync_status: string | null;
   auth_status: string;
+  icloud_auth_status: string;
+  google_auth_status: string;
   activity_status: string;
   icloud_photos_count: number | null;
   icloud_photos_count_at: string | null;
+  google_photos_count: number | null;
+  google_photos_count_at: string | null;
+  google_account_email: string | null;
   downloaded_count: number;
+  icloud_downloaded_count?: number;
+  google_downloaded_count?: number;
+  icloud_remaining: number | null;
+  google_remaining: number | null;
   remaining_to_download: number | null;
   icloud_authenticated_at: string | null;
   icloud_2fa_at: string | null;
   icloud_session_ok_at: string | null;
   icloud_needs_auth: boolean;
   icloud_authorized: boolean;
+  google_authorized: boolean;
+  google_needs_auth: boolean;
+  google_authenticated_at: string | null;
+  linked_providers?: string[];
+  active_syncs_by_scope?: Record<string, boolean>;
   icloud_2fa_expires_at: string | null;
   days_until_2fa_expires: number | null;
   immich_library_id: string | null;
@@ -64,16 +81,22 @@ export interface ImmichLibrary {
 
 export interface PhotoCounts {
   user_id: number;
+  source?: string | null;
   icloud_photos_count: number | null;
   icloud_photos_count_at: string | null;
+  google_photos_count?: number | null;
+  google_photos_count_at?: string | null;
   downloaded_count: number;
   tracked_count: number;
+  icloud_remaining?: number | null;
+  google_remaining?: number | null;
   remaining_to_download: number | null;
 }
 
 export interface SyncRun {
   id: number;
   user_id: number;
+  scope?: string;
   started_at: string;
   finished_at: string | null;
   status: string;
@@ -87,6 +110,7 @@ export interface SyncRun {
 export interface Photo {
   id: number;
   filename: string;
+  source?: string;
   status: string;
   local_path: string | null;
   file_size: number | null;
@@ -97,6 +121,8 @@ export interface TriggerSyncResult {
   ok: boolean;
   message: string;
   user_id: number;
+  source?: string | null;
+  scope?: string | null;
   sync_run_id?: number | null;
   already_running?: boolean;
 }
@@ -125,6 +151,12 @@ export interface SettingsData {
   immich_api_key_masked: string;
   immich_scan_debounce_seconds: number;
   admin_password_set: boolean;
+  google_oauth_client_id?: string;
+  google_oauth_client_secret_set?: boolean;
+  google_oauth_client_secret_masked?: string;
+  web_public_base_url?: string;
+  google_oauth_redirect_uri?: string;
+  token_encryption_key_set?: boolean;
 }
 
 export interface DashboardStats {
@@ -154,7 +186,10 @@ export const api = {
   me: () => request<{ authenticated: boolean }>("/auth/me"),
   users: () => request<User[]>("/users"),
   getUser: (id: number) => request<User>(`/users/${id}`),
-  createUser: (data: Partial<User> & { apple_id: string }, fetchCount = true) =>
+  createUser: (
+    data: { apple_id?: string | null; display_name?: string; download_dir?: string },
+    fetchCount = true
+  ) =>
     request<User>(`/users?fetch_count=${fetchCount}`, {
       method: "POST",
       body: JSON.stringify(data),
@@ -163,19 +198,25 @@ export const api = {
     request<{ ok: boolean; queued: number[]; message: string }>("/users/fetch-all-counts", {
       method: "POST",
     }),
-  updateUser: (id: number, data: Partial<User> & { reschedule_sync?: boolean }) =>
+  updateUser: (id: number, data: Partial<User> & { reschedule_sync?: boolean; apple_id?: string }) =>
     request<User>(`/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   testUserImmich: (id: number) =>
     request<{ ok: boolean; message: string }>(`/users/${id}/immich/test`, { method: "POST" }),
   deleteUser: (id: number) => request<void>(`/users/${id}`, { method: "DELETE" }),
-  triggerSync: (id: number) =>
-    request<TriggerSyncResult>(`/users/${id}/sync`, { method: "POST" }),
-  fetchPhotoCount: (id: number) =>
+  triggerSync: (id: number, source?: PhotoSource) => {
+    const q = source ? `?source=${source}` : "";
+    return request<TriggerSyncResult>(`/users/${id}/sync${q}`, { method: "POST" });
+  },
+  fetchPhotoCount: (id: number, source: PhotoSource) =>
     request<{ ok: boolean; message: string; already_running?: boolean }>(
-      `/users/${id}/fetch-count`,
+      `/users/${id}/fetch-count?source=${source}`,
       { method: "POST" }
     ),
   photoCounts: (id: number) => request<PhotoCounts>(`/users/${id}/photo-counts`),
+  startGoogleOAuth: (id: number) =>
+    request<{ authorize_url: string }>(`/users/${id}/auth/google/start`, { method: "POST" }),
+  disconnectGoogle: (id: number) =>
+    request<{ ok: boolean }>(`/users/${id}/auth/google/disconnect`, { method: "POST" }),
   triggerDueSyncs: () =>
     request<TriggerDueResult>("/sync/trigger-due", { method: "POST" }),
   startICloudAuth: (id: number, password: string) =>
@@ -211,6 +252,7 @@ export const api = {
       telegram_bot_token?: string;
       immich_api_key?: string;
       admin_password?: string;
+      google_oauth_client_secret?: string;
     }
   ) => request<SettingsData>("/settings", { method: "PATCH", body: JSON.stringify(data) }),
   testTelegram: () => request<{ ok: boolean }>("/telegram/test", { method: "POST" }),

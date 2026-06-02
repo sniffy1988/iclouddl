@@ -26,6 +26,17 @@ class Base(DeclarativeBase):
     pass
 
 
+class PhotoSource(str, enum.Enum):
+    icloud = "icloud"
+    google_photos = "google_photos"
+
+
+class SyncRunScope(str, enum.Enum):
+    icloud = "icloud"
+    google_photos = "google_photos"
+    all = "all"
+
+
 class PhotoStatus(str, enum.Enum):
     pending = "pending"
     downloaded = "downloaded"
@@ -56,7 +67,7 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    apple_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    apple_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True, index=True)
     display_name: Mapped[str | None] = mapped_column(String(255))
     download_dir: Mapped[str] = mapped_column(String(1024), nullable=False)
     sync_interval_seconds: Mapped[int] = mapped_column(Integer, default=21600)
@@ -71,6 +82,12 @@ class User(Base):
     icloud_2fa_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     icloud_session_ok_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     icloud_needs_auth: Mapped[bool] = mapped_column(Boolean, default=True)
+    google_account_email: Mapped[str | None] = mapped_column(String(255))
+    google_refresh_token_encrypted: Mapped[str | None] = mapped_column(Text)
+    google_authenticated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    google_needs_auth: Mapped[bool] = mapped_column(Boolean, default=True)
+    google_photos_count: Mapped[int | None] = mapped_column(Integer)
+    google_photos_count_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     immich_library_id: Mapped[str | None] = mapped_column(String(36))
     immich_scan_after_sync: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -98,13 +115,17 @@ class SyncCursor(Base):
 class Photo(Base):
     __tablename__ = "photos"
     __table_args__ = (
-        UniqueConstraint("user_id", "icloud_asset_id", name="uq_photo_user_asset"),
+        UniqueConstraint("user_id", "source", "provider_asset_id", name="uq_photo_user_source_asset"),
         Index("ix_photos_user_status", "user_id", "status"),
+        Index("ix_photos_user_source_status", "user_id", "source", "status"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    icloud_asset_id: Mapped[str] = mapped_column(String(512), nullable=False)
+    source: Mapped[PhotoSource] = mapped_column(
+        Enum(PhotoSource, native_enum=False), default=PhotoSource.icloud
+    )
+    provider_asset_id: Mapped[str] = mapped_column(String(512), nullable=False)
     filename: Mapped[str] = mapped_column(String(1024), nullable=False)
     local_path: Mapped[str | None] = mapped_column(String(2048))
     file_size: Mapped[int | None] = mapped_column(BigInteger)
@@ -125,10 +146,16 @@ class Photo(Base):
 
 class SyncRun(Base):
     __tablename__ = "sync_runs"
-    __table_args__ = (Index("ix_sync_runs_user_started", "user_id", "started_at"),)
+    __table_args__ = (
+        Index("ix_sync_runs_user_started", "user_id", "started_at"),
+        Index("ix_sync_runs_user_status_scope", "user_id", "status", "scope"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    scope: Mapped[SyncRunScope] = mapped_column(
+        Enum(SyncRunScope, native_enum=False), default=SyncRunScope.all
+    )
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[SyncRunStatus] = mapped_column(
@@ -194,6 +221,8 @@ class RuntimeSettings(Base):
     immich_api_key: Mapped[str] = mapped_column(String(512), default="")
     immich_scan_debounce_seconds: Mapped[int] = mapped_column(Integer, default=120)
     admin_password_hash: Mapped[str] = mapped_column(String(256), default="")
+    google_oauth_client_id: Mapped[str] = mapped_column(String(512), default="")
+    google_oauth_client_secret: Mapped[str] = mapped_column(String(512), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 

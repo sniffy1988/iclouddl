@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useToast } from "../components/ToastProvider";
 import AuthorizeButton from "../components/AuthorizeButton";
 import { format2faDaysLeft } from "../utils/format2fa";
 import StatusPill from "../components/StatusPill";
+import ConnectGoogleButton from "../components/ConnectGoogleButton";
+import FieldHelp, { HelpBox } from "../components/FieldHelp";
 import FetchCountButton from "../components/FetchCountButton";
 import SyncNowButton from "../components/SyncNowButton";
 import {
@@ -39,6 +41,7 @@ export default function UserDetail() {
   const { id } = useParams<{ id: string }>();
   const userId = Number(id);
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { data: user } = useQuery({
     queryKey: ["user", userId],
@@ -46,7 +49,13 @@ export default function UserDetail() {
     enabled: !!userId,
     refetchInterval: (q) => {
       const activity = q.state.data?.activity_status;
-      return activity === "queued" || activity === "syncing" || activity === "counting"
+      return (
+        activity === "queued" ||
+        activity === "syncing" ||
+        activity === "counting" ||
+        activity === "counting_icloud" ||
+        activity === "counting_google"
+      )
         ? 3000
         : false;
     },
@@ -56,7 +65,12 @@ export default function UserDetail() {
     queryKey: ["photo-counts", userId],
     queryFn: () => api.photoCounts(userId),
     enabled: !!userId,
-    refetchInterval: user?.activity_status === "counting" ? 3000 : false,
+    refetchInterval:
+      user?.activity_status === "counting" ||
+      user?.activity_status === "counting_icloud" ||
+      user?.activity_status === "counting_google"
+        ? 3000
+        : false,
   });
   const { data: photos } = useQuery({
     queryKey: ["photos", userId],
@@ -72,6 +86,7 @@ export default function UserDetail() {
   });
 
   const [displayName, setDisplayName] = useState("");
+  const [appleIdEdit, setAppleIdEdit] = useState("");
   const [downloadDir, setDownloadDir] = useState("");
   const [intervalPreset, setIntervalPreset] = useState("21600");
   const [customHours, setCustomHours] = useState("6");
@@ -82,6 +97,7 @@ export default function UserDetail() {
   useEffect(() => {
     if (!user) return;
     setDisplayName(user.display_name ?? "");
+    setAppleIdEdit(user.apple_id ?? "");
     setDownloadDir(user.download_dir);
     setIntervalPreset(presetForSeconds(user.sync_interval_seconds));
     setCustomHours(String(secondsToHours(user.sync_interval_seconds)));
@@ -91,6 +107,15 @@ export default function UserDetail() {
   }, [user]);
 
   const toast = useToast();
+
+  useEffect(() => {
+    if (searchParams.get("google") === "connected") {
+      toast.success("Google Photos connected");
+      qc.invalidateQueries({ queryKey: ["user", userId] });
+      searchParams.delete("google");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, toast, qc, userId]);
 
   const testImmich = useMutation({
     mutationFn: () => api.testUserImmich(userId),
@@ -115,7 +140,8 @@ export default function UserDetail() {
           ? hoursToSeconds(parseFloat(customHours) || 6)
           : Number(intervalPreset);
       return api.updateUser(userId, {
-        display_name: displayName.trim() || user!.apple_id,
+        display_name: displayName.trim() || user!.account_label || user!.apple_id || "User",
+        apple_id: appleIdEdit.trim() || undefined,
         download_dir: downloadDir.trim(),
         sync_interval_seconds: seconds,
         enabled: scheduledEnabled,
@@ -137,10 +163,14 @@ export default function UserDetail() {
   const isActive =
     user.activity_status === "queued" ||
     user.activity_status === "syncing" ||
-    user.activity_status === "counting";
+    user.activity_status === "counting" ||
+    user.activity_status === "counting_icloud" ||
+    user.activity_status === "counting_google";
 
-  const isCounting = user.activity_status === "counting";
-  const remaining = isCounting ? null : counts?.remaining_to_download ?? null;
+  const isCountingIcloud = user.activity_status === "counting_icloud";
+  const isCountingGoogle = user.activity_status === "counting_google";
+  const syncBusy = user.active_syncs_by_scope ?? {};
+  const title = user.account_label || user.display_name || user.apple_id || user.google_account_email || `User #${user.id}`;
 
   const syncIntervalSeconds =
     intervalPreset === "custom"
@@ -156,11 +186,14 @@ export default function UserDetail() {
       </div>
       <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-2xl font-semibold">{user.apple_id}</h2>
-          <p className="text-slate-500 text-sm mt-1">User #{user.id} · manage schedule, storage, and iCloud</p>
+          <h2 className="text-2xl font-semibold">{title}</h2>
+          <p className="text-slate-500 text-sm mt-1">
+            User #{user.id} · iCloud + Google Photos · use {"{source}/"} in path template for dual-source
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusPill variant="auth" status={user.auth_status} />
+          <StatusPill variant="auth" status={user.icloud_auth_status} />
+          <StatusPill variant="auth" status={user.google_auth_status} />
           <StatusPill variant="activity" status={user.activity_status} />
         </div>
       </div>
@@ -169,55 +202,165 @@ export default function UserDetail() {
         <div className="bg-sky-900/30 border border-sky-700 rounded-xl p-4 mb-6 flex items-center gap-3">
           <span className="inline-block w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
           <span className="text-sky-300 text-sm">
-            {user.activity_status === "counting"
-              ? "Indexing photos from iCloud…"
-              : "Sync in progress — this page refreshes automatically"}
+            {user.activity_status === "counting_icloud"
+              ? "Indexing iCloud library…"
+              : user.activity_status === "counting_google"
+                ? "Indexing Google Photos…"
+                : user.activity_status === "counting"
+                  ? "Indexing photos…"
+                  : "Sync in progress — this page refreshes automatically"}
           </span>
         </div>
       )}
 
-      <div className="grid md:grid-cols-3 gap-4 mb-6">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <p className="text-slate-500 text-sm">iCloud photos</p>
           <p className="text-2xl font-semibold mt-1">
-            {isCounting
+            {isCountingIcloud
               ? (user.icloud_photos_count ?? 0).toLocaleString()
               : (user.icloud_photos_count?.toLocaleString() ?? "—")}
           </p>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p className="text-slate-500 text-sm">Downloaded</p>
+          <p className="text-slate-500 text-sm">Google photos</p>
+          <p className="text-2xl font-semibold mt-1">
+            {isCountingGoogle
+              ? (user.google_photos_count ?? 0).toLocaleString()
+              : (user.google_photos_count?.toLocaleString() ?? "—")}
+          </p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <p className="text-slate-500 text-sm">Downloaded (all)</p>
           <p className="text-2xl font-semibold mt-1">{counts?.downloaded_count ?? 0}</p>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p className="text-slate-500 text-sm">Remaining</p>
-          <p className="text-2xl font-semibold mt-1">{isCounting ? "…" : (remaining ?? "—")}</p>
+          <p className="text-slate-500 text-sm">Remaining (est.)</p>
+          <p className="text-2xl font-semibold mt-1">
+            {isCountingIcloud || isCountingGoogle
+              ? "…"
+              : (counts?.remaining_to_download?.toLocaleString() ?? "—")}
+          </p>
         </div>
       </div>
 
       <div className="space-y-6 mb-8">
         <Section
-          title="iCloud sign-in"
-          description="Authorize once with password and 2FA. The worker reuses the saved session until it expires."
+          title="iCloud"
+          description="Authorize with Apple ID, password, and 2FA. Count indexes metadata; Sync downloads files."
         >
+          {!user.apple_id && (
+            <p className="text-amber-400 text-sm mb-3">
+              Set an Apple ID in Storage & profile below to use iCloud.
+            </p>
+          )}
+          <HelpBox title="Before you sign in">
+            <ul className="list-disc list-inside space-y-1">
+              <li>
+                On iPhone/iPad: <strong className="text-slate-300">Settings → Apple ID → iCloud →
+                Access iCloud Data on the Web</strong> must be on.
+              </li>
+              <li>
+                <strong className="text-slate-300">Advanced Data Protection</strong> must be off
+                (blocks server photo API).
+              </li>
+              <li>
+                Use your Apple ID password; if 2FA is enabled, approve on a trusted device or enter
+                the code in Telegram with <span className="font-mono">/code 123456</span> (if
+                configured in Settings).
+              </li>
+            </ul>
+          </HelpBox>
           <div className="flex flex-wrap items-center gap-3 mb-3">
-            <AuthorizeButton
-              userId={userId}
-              appleId={user.apple_id}
-              icloudAuthorized={user.icloud_authorized}
-              icloudNeedsAuth={user.icloud_needs_auth}
-            />
-            {user.icloud_2fa_at && (
-              <span className="text-slate-400 text-sm">
-                Trusted session: {format2faDaysLeft(user.days_until_2fa_expires)}
-              </span>
+            {user.apple_id && (
+              <>
+                <AuthorizeButton
+                  userId={userId}
+                  appleId={user.apple_id}
+                  icloudAuthorized={user.icloud_authorized}
+                  icloudNeedsAuth={user.icloud_needs_auth}
+                />
+                {user.icloud_2fa_at && (
+                  <span className="text-slate-400 text-sm">
+                    Trusted session: {format2faDaysLeft(user.days_until_2fa_expires)}
+                  </span>
+                )}
+              </>
             )}
           </div>
           {user.icloud_authenticated_at && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 mb-3">
               Last sign-in: {new Date(user.icloud_authenticated_at).toLocaleString()}
             </p>
           )}
+          <FieldHelp className="mb-3">
+            <strong className="text-slate-400">Count iCloud</strong> — scans the library into the
+            database (no files). <strong className="text-slate-400">Sync iCloud</strong> — downloads
+            pending photos only.
+          </FieldHelp>
+          <div className="flex flex-wrap gap-2">
+            <FetchCountButton
+              userId={userId}
+              source="icloud"
+              disabled={!user.enabled || !user.apple_id || syncBusy.icloud}
+            />
+            <SyncNowButton
+              userId={userId}
+              source="icloud"
+              disabled={
+                !user.enabled ||
+                !user.apple_id ||
+                !user.icloud_authorized ||
+                user.icloud_needs_auth ||
+                syncBusy.icloud
+              }
+            />
+          </div>
+        </Section>
+
+        <Section
+          title="Google Photos"
+          description="One-time OAuth per user. App credentials are configured under Settings → Google Photos OAuth."
+        >
+          <HelpBox title="Setup checklist">
+            <ol className="list-decimal list-inside space-y-1.5">
+              <li>
+                In <strong className="text-slate-300">Settings</strong>: Google OAuth client ID +
+                secret, and server <span className="font-mono">TOKEN_ENCRYPTION_KEY</span> in .env.
+              </li>
+              <li>Click <strong className="text-slate-300">Connect Google Photos</strong> below and
+                sign in with the Google account that owns the library.</li>
+              <li>
+                Use <strong className="text-slate-300">Count Google</strong> then{" "}
+                <strong className="text-slate-300">Sync Google</strong> (same as iCloud).
+              </li>
+            </ol>
+          </HelpBox>
+          {user.google_account_email && (
+            <p className="text-sm text-slate-400 mb-2">Connected as {user.google_account_email}</p>
+          )}
+          <ConnectGoogleButton userId={userId} disabled={!user.enabled} />
+          <FieldHelp className="mt-3">
+            Opens Google sign-in in a new tab. After approving, you are redirected back to this user
+            page. If connect fails, check redirect URI in Google Cloud matches Settings.
+          </FieldHelp>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <FetchCountButton
+              userId={userId}
+              source="google_photos"
+              disabled={!user.enabled || !user.google_authorized || syncBusy.google_photos}
+            />
+            <SyncNowButton
+              userId={userId}
+              source="google_photos"
+              disabled={
+                !user.enabled ||
+                !user.google_authorized ||
+                user.google_needs_auth ||
+                syncBusy.google_photos
+              }
+            />
+          </div>
         </Section>
 
         <Section
@@ -304,15 +447,26 @@ export default function UserDetail() {
               />
             </div>
             <div>
+              <label className="block text-sm text-slate-400 mb-1">Apple ID (iCloud)</label>
+              <input
+                value={appleIdEdit}
+                onChange={(e) => setAppleIdEdit(e.target.value)}
+                placeholder="apple@icloud.com"
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
               <label className="block text-sm text-slate-400 mb-1">Download directory</label>
               <input
                 value={downloadDir}
                 onChange={(e) => setDownloadDir(e.target.value)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono"
               />
-              <p className="text-xs text-slate-500 mt-1">
-                Absolute path on the server where this user&apos;s files are stored.
-              </p>
+              <FieldHelp>
+                Absolute path on the server. Must match an Immich external library import path if
+                you use Immich. For iCloud + Google, use a path template with {"{source}"} in
+                Settings.
+              </FieldHelp>
             </div>
           </div>
         </Section>
@@ -384,20 +538,19 @@ export default function UserDetail() {
           )}
         </Section>
 
-        <Section title="Actions" description="Manual operations — they do not change the schedule.">
-          <div className="flex flex-wrap gap-3">
-            <FetchCountButton userId={userId} disabled={!user.enabled} />
-            <SyncNowButton
-              userId={userId}
-              appleId={user.apple_id}
-              disabled={
-                !user.enabled || !user.icloud_authorized || user.icloud_needs_auth
-              }
-            />
-          </div>
-          <p className="text-slate-500 text-xs mt-3">
-            Fetch count indexes iCloud metadata into the database. Sync now downloads files immediately.
-          </p>
+        <Section
+          title="Sync all providers"
+          description="Runs iCloud and Google in parallel. The scheduler uses this same behavior on each user's interval."
+        >
+          <FieldHelp className="mb-3">
+            Blocked while a full <span className="font-mono">all</span> sync is already running.
+            Per-provider sync buttons can still run side by side (e.g. iCloud + Google at once).
+          </FieldHelp>
+          <SyncNowButton
+            userId={userId}
+            disabled={!user.enabled || syncBusy.all}
+            label="Sync all"
+          />
         </Section>
 
         <div className="flex flex-wrap items-center gap-3">

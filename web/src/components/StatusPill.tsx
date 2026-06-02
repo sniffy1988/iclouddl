@@ -5,6 +5,7 @@ const AUTH_STYLES: Record<string, string> = {
   reauth_required: "bg-amber-900/50 text-amber-400",
   expired: "bg-red-900/50 text-red-400",
   not_authorized: "bg-slate-800 text-slate-400",
+  not_linked: "bg-slate-800 text-slate-500",
 };
 
 const AUTH_LABELS: Record<string, string> = {
@@ -12,12 +13,15 @@ const AUTH_LABELS: Record<string, string> = {
   reauth_required: "Re-auth required",
   expired: "Session expired",
   not_authorized: "Not authorized",
+  not_linked: "Not linked",
 };
 
 const ACTIVITY_STYLES: Record<string, string> = {
   completed: "bg-green-900/50 text-green-400",
   count_ready: "bg-green-900/50 text-green-400",
   counting: "bg-sky-900/50 text-sky-400",
+  counting_icloud: "bg-sky-900/50 text-sky-400",
+  counting_google: "bg-sky-900/50 text-sky-400",
   syncing: "bg-sky-900/50 text-sky-400",
   queued: "bg-sky-900/50 text-sky-400",
   failed: "bg-red-900/50 text-red-400",
@@ -29,6 +33,8 @@ const ACTIVITY_LABELS: Record<string, string> = {
   completed: "Sync done",
   count_ready: "Indexed",
   counting: "Indexing",
+  counting_icloud: "Indexing iCloud",
+  counting_google: "Indexing Google",
   syncing: "Syncing",
   queued: "Queued",
   failed: "Failed",

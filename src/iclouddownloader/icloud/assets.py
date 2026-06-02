@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from iclouddownloader.db.models import Photo, PhotoStatus, User
+from iclouddownloader.db.models import Photo, PhotoSource, PhotoStatus, User
 from iclouddownloader.icloud.library import iter_library_photos
 
 
@@ -46,7 +46,11 @@ def upsert_photo_record(
     """Insert or update a photo row from iCloud metadata (no download)."""
     aid = asset_id(api_photo)
     existing = db.scalar(
-        select(Photo).where(Photo.user_id == user_id, Photo.icloud_asset_id == aid)
+        select(Photo).where(
+            Photo.user_id == user_id,
+            Photo.source == PhotoSource.icloud,
+            Photo.provider_asset_id == aid,
+        )
     )
     filename = asset_filename(api_photo)
     date = asset_date(api_photo)
@@ -63,7 +67,8 @@ def upsert_photo_record(
 
     record = Photo(
         user_id=user_id,
-        icloud_asset_id=aid,
+        source=PhotoSource.icloud,
+        provider_asset_id=aid,
         filename=filename,
         status=PhotoStatus.pending,
         asset_date=date,

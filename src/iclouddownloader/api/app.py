@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from iclouddownloader.api.routes import auth, photos, settings, sync, users
+from iclouddownloader.api.routes import auth, google_auth, photos, settings, sync, users
 
 
 def create_app() -> FastAPI:
@@ -21,6 +21,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(users.router)
+    app.include_router(google_auth.router)
     app.include_router(photos.router)
     app.include_router(sync.router)
     app.include_router(settings.router)

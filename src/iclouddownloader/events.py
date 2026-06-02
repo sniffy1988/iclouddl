@@ -15,6 +15,9 @@ class SyncEvent:
     type: str
     user_id: int | None = None
     apple_id: str | None = None
+    account_label: str | None = None
+    source: str | None = None
+    scope: str | None = None
     sync_run_id: int | None = None
     payload: dict[str, Any] = field(default_factory=dict)
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

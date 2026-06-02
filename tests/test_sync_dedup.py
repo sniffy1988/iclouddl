@@ -1,8 +1,6 @@
-from datetime import datetime, timezone
-from pathlib import Path
 from unittest.mock import MagicMock
 
-from iclouddownloader.db.models import Photo, PhotoStatus, User
+from iclouddownloader.db.models import Photo, PhotoSource, PhotoStatus, User
 from iclouddownloader.icloud.sync import PhotoSyncEngine, _asset_id, _sha256
 
 
@@ -28,7 +26,8 @@ def test_photo_skip_when_downloaded(db_session, tmp_path):
 
     existing = Photo(
         user_id=user.id,
-        icloud_asset_id="asset-1",
+        source=PhotoSource.icloud,
+        provider_asset_id="asset-1",
         filename="photo.jpg",
         status=PhotoStatus.downloaded,
         local_path=str(local_file),
@@ -37,19 +36,15 @@ def test_photo_skip_when_downloaded(db_session, tmp_path):
     db_session.commit()
 
     engine = PhotoSyncEngine(db_session)
-    from iclouddownloader.db.models import SyncRun, SyncRunStatus
-
-    sync_run = SyncRun(user_id=user.id, status=SyncRunStatus.running)
-    db_session.add(sync_run)
-    db_session.commit()
+    counters = {"discovered": 0, "downloaded": 0, "failed": 0, "skipped": 0}
 
     api_photo = MagicMock()
     api_photo.id = "asset-1"
     api_photo.filename = "photo.jpg"
 
-    result = engine._process_photo(user, api_photo, tmp_path, sync_run)
+    result = engine._process_photo(user, api_photo, tmp_path, counters)
     assert result == "skipped"
-    assert sync_run.photos_skipped == 1
+    assert counters["skipped"] == 1
 
 
 def test_sha256(tmp_path):

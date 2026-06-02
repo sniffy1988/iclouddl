@@ -6,9 +6,8 @@ from pathlib import Path
 
 DEFAULT_DOWNLOAD_PATH_TEMPLATE = "YYYY/MM/DD/{filename}"
 
-# Path segments may use date tokens and/or {filename}
 _TOKEN_PATTERN = re.compile(
-    r"YYYY|YY|MM|DD|HH|mm|ss|\{filename\}",
+    r"YYYY|YY|MM|DD|HH|mm|ss|\{filename\}|\{source\}",
     re.IGNORECASE,
 )
 
@@ -21,24 +20,19 @@ def validate_path_template(template: str) -> str:
         raise ValueError("Path template cannot contain '..'")
     if not _TOKEN_PATTERN.search(template):
         raise ValueError(
-            "Template must include date tokens (YYYY, MM, DD, …) and/or {filename}"
+            "Template must include date tokens (YYYY, MM, DD, …), {source}, and/or {filename}"
         )
     return template
 
 
-def apply_path_template(template: str, dt: datetime, filename: str) -> Path:
-    """Build a relative path under the user's download_dir.
-
-    Supported tokens (case-sensitive):
-      YYYY — 4-digit year
-      YY   — 2-digit year
-      MM   — month (01–12)
-      DD   — day (01–31)
-      HH   — hour (00–23)
-      mm   — minute
-      ss   — second
-      {filename} — original iCloud filename
-    """
+def apply_path_template(
+    template: str,
+    dt: datetime,
+    filename: str,
+    *,
+    source: str | None = None,
+) -> Path:
+    """Build a relative path under the user's download_dir."""
     template = validate_path_template(template)
     parts = [p for p in template.split("/") if p]
 
@@ -48,6 +42,10 @@ def apply_path_template(template: str, dt: datetime, filename: str) -> Path:
         if part == "{filename}":
             out.append(filename)
             has_filename = True
+            continue
+        if part == "{source}":
+            if source:
+                out.append(source)
             continue
         segment = (
             part.replace("YYYY", f"{dt.year:04d}")

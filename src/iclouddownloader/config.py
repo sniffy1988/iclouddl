@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     web_port: int = 8765
     web_session_secret: str = "change-this-secret-key"
     web_session_ttl_hours: int = 168
+    web_public_base_url: str = "http://localhost:8765"
+    token_encryption_key: str = ""
 
     icloud_2fa_delivery: str = "trusted_device"
     icloud_trusted_session_days: int = 30
@@ -39,6 +41,8 @@ class EffectiveSettings(Settings):
     telegram_bot_token: str = ""
     telegram_admin_chat_id: str = ""
     telegram_allowed_user_ids: str = ""
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
 
     @property
     def telegram_allowed_ids(self) -> list[int]:

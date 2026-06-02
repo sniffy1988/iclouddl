@@ -130,8 +130,12 @@ export default function AuthorizeButton({
             {step === "password" && (
               <div className="space-y-3 mb-4">
                 <p className="text-slate-400 text-sm">
-                  Step 1 — enter your Apple ID password. If 2FA is enabled, you will be asked for a
-                  code next.
+                  Step 1 — enter your Apple ID password (not an app-specific password unless you use
+                  one for iCloud). If 2FA is enabled, you will be asked for a code next.
+                </p>
+                <p className="text-slate-500 text-xs">
+                  Requires “Access iCloud Data on the Web” on the device and Advanced Data
+                  Protection turned off. See user page for details.
                 </p>
                 <label className="block text-sm text-slate-400">Apple ID password</label>
                 <input
@@ -167,7 +171,9 @@ export default function AuthorizeButton({
                   <p className="text-slate-400 text-xs">{deliveryHint}</p>
                 )}
                 <p className="text-slate-500 text-xs">
-                  Do not click Sign in again — that sends another code.
+                  Do not click Sign in again — that sends another code. Or send{" "}
+                  <span className="font-mono">/code 123456</span> to your Telegram bot if allowed in
+                  Settings.
                 </p>
                 <input
                   value={code}

@@ -24,6 +24,9 @@ dependencies = [
     "python-multipart",
     "bcrypt",
     "sse-starlette",
+    "google-auth-oauthlib",
+    "google-auth",
+    "cryptography",
 ]
 
 [project.optional-dependencies]

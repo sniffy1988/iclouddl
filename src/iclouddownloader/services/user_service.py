@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from iclouddownloader.config import get_settings
 from iclouddownloader.db.models import User
 from iclouddownloader.icloud.client import download_dir_for_user
+from iclouddownloader.providers.base import linked_providers
 
 
 class UserService:
@@ -23,9 +24,14 @@ class UserService:
     def get_by_apple_id(self, apple_id: str) -> User | None:
         return self.db.scalar(select(User).where(User.apple_id == apple_id))
 
+    @staticmethod
+    def validate_has_provider(user: User) -> None:
+        if not linked_providers(user) and not user.apple_id and not user.google_account_email:
+            raise ValueError("Link at least iCloud (Apple ID) or Google Photos before syncing")
+
     def create_user(
         self,
-        apple_id: str,
+        apple_id: str | None = None,
         display_name: str | None = None,
         download_dir: str | None = None,
         sync_interval_seconds: int | None = None,
@@ -33,18 +39,22 @@ class UserService:
     ) -> User:
         settings = get_settings()
         interval = sync_interval_seconds or settings.default_sync_interval_seconds
+        label = display_name or apple_id or "New user"
         user = User(
             apple_id=apple_id,
-            display_name=display_name or apple_id,
+            display_name=label,
             download_dir=download_dir or "",
             sync_interval_seconds=interval,
             library_key=library_key,
             next_sync_at=datetime.now(timezone.utc),
+            icloud_needs_auth=bool(apple_id),
         )
         self.db.add(user)
         self.db.flush()
         if not user.download_dir:
-            user.download_dir = str(download_dir_for_user(user.id, user.apple_id))
+            user.download_dir = str(
+                download_dir_for_user(user.id, apple_id or f"user-{user.id}", custom_dir=None)
+            )
         self.db.commit()
         self.db.refresh(user)
         return user
@@ -67,6 +77,9 @@ class UserService:
                 interval_changed = True
             if key == "immich_library_id":
                 user.immich_library_id = str(value).strip() or None
+                continue
+            if key == "apple_id" and value:
+                user.apple_id = str(value).strip()
                 continue
             setattr(user, key, value)
 
