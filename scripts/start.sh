@@ -17,7 +17,7 @@ Usage: ./start.sh [command]
 
 Commands:
   up, start     Build, migrate, and start api + worker (default)
-  logs          Follow api + worker logs (colorful when FORCE_COLOR=1)
+  logs          Follow api, worker, and db-viewer logs (colorful when FORCE_COLOR=1)
   down          Stop containers
   migrate       Run Alembic migrations only (Docker)
   help          Show this help
@@ -102,7 +102,13 @@ mkdir -p data/downloads data/cookies
 
 case "$cmd" in
   logs)
-    exec "$ROOT/scripts/compose.sh" logs -f api worker
+    services=(api worker)
+    enabled="$(env_var_from_dotenv DB_VIEWER_ENABLED 1)"
+    case "$enabled" in
+      0|false|no|off|FALSE|NO|OFF) ;;
+      *) services+=(db-viewer) ;;
+    esac
+    exec "$ROOT/scripts/compose.sh" logs -f "${services[@]}"
     ;;
   down)
     exec "$ROOT/scripts/compose.sh" down
@@ -118,6 +124,19 @@ case "$cmd" in
 
     read_ports
 
+    enabled="$(env_var_from_dotenv DB_VIEWER_ENABLED 1)"
+    case "$enabled" in
+      0|false|no|off|FALSE|NO|OFF) ;;
+      *)
+        sleep 1
+        if [ -n "$("$ROOT/scripts/compose.sh" ps -q db-viewer 2>/dev/null || true)" ]; then
+          echo ""
+          echo "DB viewer startup:"
+          "$ROOT/scripts/compose.sh" logs --no-color db-viewer 2>/dev/null | tail -5 || true
+        fi
+        ;;
+    esac
+
     echo ""
     echo "iCloud Photo Downloader is running (Docker)."
     echo "  Web UI:  http://localhost:${WEB_PORT}"
@@ -129,7 +148,7 @@ case "$cmd" in
     echo "  Logs:    Settings → Logging level; console colors via FORCE_COLOR in .env"
     echo ""
     echo "Useful commands:"
-    echo "  ./start.sh logs              # follow api + worker (colorful logs)"
+    echo "  ./start.sh logs              # follow api, worker, and db-viewer logs"
     echo "  ./start.sh down              # stop containers"
     echo "  ./start.sh migrate           # migrations only"
     echo "  ./scripts/start-local.sh     # run without Docker (venv, db-upgrade, npm build)"

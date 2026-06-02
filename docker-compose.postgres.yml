@@ -64,11 +64,15 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:${DB_VIEWER_PORT:-8766}:8080"
+    volumes:
+      - ./scripts/db-viewer-entrypoint.sh:/usr/local/bin/db-viewer-entrypoint.sh:ro
     environment:
+      DB_VIEWER_MODE: adminer
+      DB_VIEWER_PORT: ${DB_VIEWER_PORT:-8766}
       ADMINER_DEFAULT_SERVER: postgres
       ADMINER_DEFAULT_USERNAME: ${POSTGRES_USER:-iclouddownloader}
       ADMINER_DEFAULT_DB: ${POSTGRES_DB:-iclouddownloader}
-    command: ["php", "-d", "variables_order=EGPCS", "-S", "[::]:8080", "-t", "/var/www/html"]
+    entrypoint: ["/bin/sh", "/usr/local/bin/db-viewer-entrypoint.sh"]
     depends_on:
       postgres:
         condition: service_healthy

@@ -71,6 +71,8 @@ After `./start.sh`, open **http://127.0.0.1:8766** (port `DB_VIEWER_PORT` in `.e
 
 Disable with `DB_VIEWER_ENABLED=0`. Optional `DB_VIEWER_PASSWORD` protects sqlite-web. The viewer binds to **127.0.0.1** only (not exposed on your LAN).
 
+Startup lines appear in container logs (uvicorn-style), e.g. `docker compose logs db-viewer` or `./start.sh logs`.
+
 Local (no Docker): `pip install sqlite-web && sqlite_web -r -p 8766 ./data/iclouddownloader.db`
 
 ### Other commands

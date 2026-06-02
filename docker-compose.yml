@@ -58,10 +58,11 @@ services:
       - "127.0.0.1:${DB_VIEWER_PORT:-8766}:8080"
     volumes:
       - ./data:/data:ro
+      - ./scripts/db-viewer-entrypoint.sh:/usr/local/bin/db-viewer-entrypoint.sh:ro
     environment:
+      PYTHONUNBUFFERED: "1"
+      DB_VIEWER_MODE: sqlite
+      DB_VIEWER_PORT: ${DB_VIEWER_PORT:-8766}
       SQLITE_DATABASE: iclouddownloader.db
       SQLITE_WEB_PASSWORD: ${DB_VIEWER_PASSWORD:-}
-    command:
-      - iclouddownloader.db
-      - --read-only
-      - --no-browser
+    entrypoint: ["/bin/sh", "/usr/local/bin/db-viewer-entrypoint.sh"]

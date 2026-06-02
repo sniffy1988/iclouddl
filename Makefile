@@ -22,7 +22,7 @@ help:
 	@echo "  make test      - Run pytest locally"
 
 start:
-	@chmod +x scripts/start.sh scripts/start-local.sh scripts/compose.sh start.sh 2>/dev/null || true
+	@chmod +x scripts/start.sh scripts/start-local.sh scripts/compose.sh scripts/db-viewer-entrypoint.sh start.sh 2>/dev/null || true
 	@./scripts/start.sh
 
 start-local:
@@ -41,6 +41,7 @@ down:
 	./start.sh down
 
 logs:
+	@chmod +x scripts/db-viewer-entrypoint.sh 2>/dev/null || true
 	./start.sh logs
 
 migrate:

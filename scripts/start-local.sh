@@ -82,6 +82,8 @@ if command -v sqlite_web >/dev/null 2>&1 && [ -f "$ROOT/data/iclouddownloader.db
   case "$enabled" in
     0|false|no|off|FALSE|NO|OFF) ;;
     *)
+      echo "INFO:     DB viewer (sqlite-web, read-only) running on http://127.0.0.1:${DB_VIEWER_PORT}"
+      echo "INFO:     Press CTRL+C to stop the whole stack (db viewer runs in background)"
       sqlite_web -r -H 127.0.0.1 -p "$DB_VIEWER_PORT" -x "$ROOT/data/iclouddownloader.db" &
       DB_VIEWER_PID=$!
       ;;
