@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from iclouddownloader.admin_auth import set_admin_password
 from iclouddownloader.config import EffectiveSettings, get_settings
 from iclouddownloader.db.models import RuntimeSettings
+from iclouddownloader.logging_setup import normalize_log_level
 from iclouddownloader.path_template import validate_path_template
 
 
@@ -116,6 +117,7 @@ class RuntimeSettingsService:
             "google_oauth_redirect_uri": f"{public_base}/api/auth/google/callback",
             "token_encryption_key_set": bool(env.token_encryption_key.strip()),
             "debug_logging_enabled": row.debug_logging_enabled,
+            "logging_level": normalize_log_level(row.logging_level),
         }
 
     def update(self, data: dict) -> RuntimeSettings:
@@ -155,8 +157,13 @@ class RuntimeSettingsService:
             secret = str(data["google_oauth_client_secret"]).strip()
             if secret and not secret.startswith("••••"):
                 row.google_oauth_client_secret = secret
-        if "debug_logging_enabled" in data and data["debug_logging_enabled"] is not None:
+        if "logging_level" in data and data["logging_level"] is not None:
+            level = normalize_log_level(data["logging_level"])
+            row.logging_level = level
+            row.debug_logging_enabled = level == "DEBUG"
+        elif "debug_logging_enabled" in data and data["debug_logging_enabled"] is not None:
             row.debug_logging_enabled = bool(data["debug_logging_enabled"])
+            row.logging_level = "DEBUG" if row.debug_logging_enabled else "OFF"
 
         self.db.commit()
         self.db.refresh(row)
@@ -189,6 +196,7 @@ def get_effective_settings_from_row(row: RuntimeSettings | None) -> EffectiveSet
             "google_oauth_client_id": row.google_oauth_client_id,
             "google_oauth_client_secret": row.google_oauth_client_secret,
             "debug_logging_enabled": row.debug_logging_enabled,
+            "logging_level": normalize_log_level(row.logging_level),
         }
     )
     return EffectiveSettings(**merged)

@@ -18,6 +18,27 @@ class ProviderSyncResult:
     photos_skipped: int = 0
     error: str | None = None
     success: bool = True
+    cancelled: bool = False
+
+
+def apply_provider_result_to_run(sync_run: SyncRun, result: ProviderSyncResult) -> None:
+    from datetime import datetime, timezone
+
+    sync_run.photos_discovered = result.photos_discovered
+    sync_run.photos_downloaded = result.photos_downloaded
+    sync_run.photos_failed = result.photos_failed
+    sync_run.photos_skipped = result.photos_skipped
+    sync_run.finished_at = datetime.now(timezone.utc)
+    sync_run.cancel_requested = False
+    if result.cancelled:
+        sync_run.status = SyncRunStatus.cancelled
+        sync_run.error_summary = "Stopped by user"
+    elif result.success:
+        sync_run.status = SyncRunStatus.completed
+        sync_run.error_summary = None
+    else:
+        sync_run.status = SyncRunStatus.failed
+        sync_run.error_summary = result.error
 
 
 def account_label(user: User) -> str:

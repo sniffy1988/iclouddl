@@ -8,17 +8,21 @@ help:
 	@echo "  make start     - Start app (Docker if installed, else local Python)"
 	@echo "  make start-local - Force local start without Docker"
 	@echo ""
+	@echo "Same via ./start.sh:"
+	@echo "  ./start.sh logs | down | migrate | help"
+	@echo ""
 	@echo "Other targets:"
 	@echo "  make build     - Build application image only"
 	@echo "  make up        - Start without rebuild"
 	@echo "  make down      - Stop and remove containers"
 	@echo "  make logs      - Follow logs (api + worker)"
 	@echo "  make migrate   - Run Alembic migrations only"
+	@echo "  make db-viewer - Open DB viewer URL hint (port 8766)"
 	@echo "  make shell-api - Open shell in api container"
 	@echo "  make test      - Run pytest locally"
 
 start:
-	@chmod +x scripts/start.sh scripts/start-local.sh start.sh 2>/dev/null || true
+	@chmod +x scripts/start.sh scripts/start-local.sh scripts/compose.sh start.sh 2>/dev/null || true
 	@./scripts/start.sh
 
 start-local:
@@ -26,26 +30,31 @@ start-local:
 	@./scripts/start-local.sh
 
 build:
-	docker compose build
+	@chmod +x scripts/compose.sh 2>/dev/null || true
+	./scripts/compose.sh build
 
 up:
 	@test -f .env || cp .env.docker.example .env
-	docker compose up -d
+	./scripts/compose.sh up -d
 
 down:
-	docker compose down
+	./start.sh down
 
 logs:
-	docker compose logs -f api worker
+	./start.sh logs
 
 migrate:
-	docker compose run --rm migrate alembic upgrade head
+	./start.sh migrate
+
+db-viewer:
+	@echo "DB viewer: http://127.0.0.1:$${DB_VIEWER_PORT:-8766}"
+	@echo "Start stack with ./start.sh (profile dbviewer). Set DB_VIEWER_ENABLED=0 to disable."
 
 shell-api:
-	docker compose exec api bash
+	./scripts/compose.sh exec api bash
 
 shell-worker:
-	docker compose exec worker bash
+	./scripts/compose.sh exec worker bash
 
 test:
 	pytest -q

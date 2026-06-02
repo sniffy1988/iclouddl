@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import shutil
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -22,7 +22,9 @@ from iclouddownloader.icloud.assets import asset_date as _asset_date
 from iclouddownloader.icloud.assets import asset_filename as _asset_filename
 from iclouddownloader.icloud.assets import asset_id as _asset_id
 from iclouddownloader.icloud.library import list_library_photos
-from iclouddownloader.providers.base import ProviderSyncResult, account_label
+from iclouddownloader.paths import provider_download_dir
+from iclouddownloader.providers.base import ProviderSyncResult, account_label, apply_provider_result_to_run
+from iclouddownloader.providers.cancel import drain_futures_with_cancel, is_sync_cancel_requested
 
 logger = logging.getLogger(__name__)
 
@@ -170,14 +172,25 @@ class PhotoSyncEngine:
     def _iter_photos(self, api) -> list[Any]:
         return list_library_photos(api)
 
-    def execute_sync(self, user: User, password: str | None = None) -> ProviderSyncResult:
+    def execute_sync(
+        self,
+        user: User,
+        password: str | None = None,
+        sync_run_id: int | None = None,
+    ) -> ProviderSyncResult:
         """Download iCloud photos; does not create or finalize a SyncRun row."""
         counters = {"discovered": 0, "downloaded": 0, "failed": 0, "skipped": 0}
         try:
+            if is_sync_cancel_requested(self.db, sync_run_id):
+                return ProviderSyncResult(
+                    source=PhotoSource.icloud,
+                    success=False,
+                    cancelled=True,
+                    error="cancelled",
+                )
             cookie_dir = cookie_dir_for_user(user.id)
             api = get_pyicloud_service(user, password=password, cookie_directory=cookie_dir)
-            base_dir = Path(user.download_dir)
-            base_dir.mkdir(parents=True, exist_ok=True)
+            base_dir = provider_download_dir(user, PhotoSource.icloud)
 
             photos = self._iter_photos(api)
             counters["discovered"] = len(photos)
@@ -187,12 +200,28 @@ class PhotoSyncEngine:
                 futures = {
                     pool.submit(self._process_photo, user, p, base_dir, counters): p for p in photos
                 }
-                done = 0
-                for future in as_completed(futures):
-                    future.result()
-                    done += 1
-                    if done % 10 == 0:
+                progress = {"done": 0}
+
+                def on_progress() -> None:
+                    progress["done"] += 1
+                    if progress["done"] % 10 == 0:
                         self.db.commit()
+
+                stopped = drain_futures_with_cancel(
+                    self.db, sync_run_id, futures, on_progress=on_progress
+                )
+                self.db.commit()
+                if stopped:
+                    return ProviderSyncResult(
+                        source=PhotoSource.icloud,
+                        photos_discovered=counters["discovered"],
+                        photos_downloaded=counters["downloaded"],
+                        photos_failed=counters["failed"],
+                        photos_skipped=counters["skipped"],
+                        success=False,
+                        cancelled=True,
+                        error="cancelled",
+                    )
 
             cursor = self._get_or_create_cursor(user)
             cursor.cursor_value = f"synced_{datetime.now(timezone.utc).isoformat()}"
@@ -236,19 +265,6 @@ class PhotoSyncEngine:
                 error=str(e),
             )
 
-    def _apply_result_to_run(self, sync_run: SyncRun, result: ProviderSyncResult) -> None:
-        sync_run.photos_discovered = result.photos_discovered
-        sync_run.photos_downloaded = result.photos_downloaded
-        sync_run.photos_failed = result.photos_failed
-        sync_run.photos_skipped = result.photos_skipped
-        if result.success:
-            sync_run.status = SyncRunStatus.completed
-            sync_run.error_summary = None
-        else:
-            sync_run.status = SyncRunStatus.failed
-            sync_run.error_summary = result.error
-        sync_run.finished_at = datetime.now(timezone.utc)
-
     def run_sync(
         self,
         user: User,
@@ -272,13 +288,18 @@ class PhotoSyncEngine:
         user.last_sync_status = "syncing"
         self.db.commit()
 
-        result = self.execute_sync(user, password=password)
-        self._apply_result_to_run(sync_run, result)
+        result = self.execute_sync(user, password=password, sync_run_id=sync_run.id)
+        apply_provider_result_to_run(sync_run, result)
         user.last_sync_at = sync_run.finished_at
-        user.last_sync_status = "completed" if result.success else "failed"
+        if result.cancelled:
+            user.last_sync_status = "idle"
+        else:
+            user.last_sync_status = "completed" if result.success else "failed"
         self.db.commit()
 
-        if result.success:
+        if result.cancelled:
+            self._publish("sync.cancelled", user, sync_run)
+        elif result.success:
             self._publish(
                 "sync.completed",
                 user,

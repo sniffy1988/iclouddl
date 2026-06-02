@@ -22,6 +22,7 @@ services:
       COOKIE_DIR: /data/cookies
       WEB_HOST: 0.0.0.0
       WEB_PORT: ${WEB_PORT:-8765}
+      FORCE_COLOR: ${FORCE_COLOR:-1}
     ports:
       - "${WEB_PORT:-8765}:${WEB_PORT:-8765}"
     volumes:
@@ -39,6 +40,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-sqlite:////data/iclouddownloader.db}
       BASE_DOWNLOAD_DIR: /data/downloads
       COOKIE_DIR: /data/cookies
+      FORCE_COLOR: ${FORCE_COLOR:-1}
     volumes:
       - ./data:/data
     depends_on:
@@ -46,3 +48,20 @@ services:
         condition: service_completed_successfully
     command: ["iclouddownloader", "daemon", "start"]
     restart: unless-stopped
+
+  # SQLite browser (localhost only). Enable with: COMPOSE_PROFILES=dbviewer ./start.sh
+  db-viewer:
+    image: ghcr.io/coleifer/sqlite-web:latest
+    profiles: ["dbviewer"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${DB_VIEWER_PORT:-8766}:8080"
+    volumes:
+      - ./data:/data:ro
+    environment:
+      SQLITE_DATABASE: iclouddownloader.db
+      SQLITE_WEB_PASSWORD: ${DB_VIEWER_PASSWORD:-}
+    command:
+      - iclouddownloader.db
+      - --read-only
+      - --no-browser

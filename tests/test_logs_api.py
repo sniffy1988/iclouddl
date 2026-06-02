@@ -34,11 +34,17 @@ def test_logs_list_clear_and_debug_setting(client: TestClient, db_session):
     r = client.get("/api/logs")
     assert r.json()["total"] == 0
 
-    r = client.patch("/api/settings", json={"debug_logging_enabled": True})
+    r = client.patch("/api/settings", json={"logging_level": "INFO"})
     assert r.status_code == 200
-    assert r.json()["debug_logging_enabled"] is True
+    data = r.json()
+    assert data["logging_level"] == "INFO"
+    assert data["debug_logging_enabled"] is False
 
     r = client.get("/api/health")
+    assert r.json()["logging_level"] == "INFO"
+
+    r = client.patch("/api/settings", json={"logging_level": "DEBUG"})
+    assert r.json()["logging_level"] == "DEBUG"
     assert r.json()["debug_logging_enabled"] is True
 
 

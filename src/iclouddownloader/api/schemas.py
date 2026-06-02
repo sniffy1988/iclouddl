@@ -183,6 +183,14 @@ class TriggerSyncResponse(BaseModel):
     already_running: bool = False
 
 
+class CancelSyncResponse(BaseModel):
+    ok: bool
+    message: str
+    user_id: int
+    source: str | None = None
+    cancelled_run_ids: list[int] = []
+
+
 class DashboardStats(BaseModel):
     total_users: int
     enabled_users: int
@@ -218,6 +226,7 @@ class SettingsResponse(BaseModel):
     google_oauth_redirect_uri: str = ""
     token_encryption_key_set: bool = False
     debug_logging_enabled: bool = False
+    logging_level: str = "OFF"
 
 
 class AppLogEntry(BaseModel):
@@ -254,3 +263,4 @@ class SettingsUpdate(BaseModel):
     google_oauth_client_id: str | None = None
     google_oauth_client_secret: str | None = None
     debug_logging_enabled: bool | None = None
+    logging_level: str | None = None

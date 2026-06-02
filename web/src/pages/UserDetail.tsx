@@ -11,6 +11,7 @@ import ConnectGoogleButton from "../components/ConnectGoogleButton";
 import ProviderConnectionBanner from "../components/ProviderConnectionBanner";
 import FieldHelp, { HelpBox } from "../components/FieldHelp";
 import FetchCountButton from "../components/FetchCountButton";
+import StopSyncButton from "../components/StopSyncButton";
 import SyncNowButton from "../components/SyncNowButton";
 import {
   SYNC_INTERVAL_PRESETS,
@@ -195,6 +196,11 @@ export default function UserDetail() {
   const syncBusy = user.active_syncs_by_scope ?? {};
   const icloudCountOk = canCountIcloud(user, syncBusy);
   const icloudSyncOk = canSyncIcloud(user, syncBusy);
+  const syncActivity =
+    user.activity_status === "syncing" || user.activity_status === "queued";
+  const icloudSyncActive = Boolean(syncBusy.icloud) || syncActivity;
+  const googleSyncActive = Boolean(syncBusy.google_photos) || syncActivity;
+  const allSyncActive = Boolean(syncBusy.all) || syncActivity;
   const title =
     user.account_label ||
     user.display_name ||
@@ -354,6 +360,9 @@ export default function UserDetail() {
                   : undefined
               }
             />
+            {icloudSyncActive && (
+              <StopSyncButton userId={userId} source="icloud" />
+            )}
           </div>
         </Section>
 
@@ -391,6 +400,9 @@ export default function UserDetail() {
                 user.google_auth_status !== "authorized" || syncBusy.google_photos
               }
             />
+            {googleSyncActive && (
+              <StopSyncButton userId={userId} source="google_photos" />
+            )}
           </div>
         </Section>
 
@@ -563,6 +575,7 @@ export default function UserDetail() {
             disabled={syncBusy.all || (!icloudSyncOk && user.google_auth_status !== "authorized")}
             label={t("buttons.syncAll")}
           />
+          {allSyncActive && <StopSyncButton userId={userId} />}
         </Section>
 
         <div className="flex flex-wrap items-center gap-3">

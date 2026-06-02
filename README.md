@@ -58,8 +58,20 @@ This starts:
 | `migrate` | Runs `alembic upgrade head` once, then exits |
 | `api` | Web UI + REST API on port **8765** (configurable via `WEB_PORT`) |
 | `worker` | Sync scheduler + Telegram bot |
+| `db-viewer` | SQLite/Postgres browser on **8766** (localhost only; optional profile) |
 
 No separate database server — SQLite file lives in **`./data/`** on your machine.
+
+### Database viewer (dev)
+
+After `./start.sh`, open **http://127.0.0.1:8766** (port `DB_VIEWER_PORT` in `.env`):
+
+- **SQLite (default)** — [sqlite-web](https://github.com/coleifer/sqlite-web), read-only browse of `data/iclouddownloader.db`
+- **PostgreSQL overlay** — [Adminer](https://www.adminer.org/) pre-filled for host `postgres` (password from `POSTGRES_PASSWORD` in `.env`)
+
+Disable with `DB_VIEWER_ENABLED=0`. Optional `DB_VIEWER_PASSWORD` protects sqlite-web. The viewer binds to **127.0.0.1** only (not exposed on your LAN).
+
+Local (no Docker): `pip install sqlite-web && sqlite_web -r -p 8766 ./data/iclouddownloader.db`
 
 ### Other commands
 
@@ -188,6 +200,9 @@ iclouddownloader telegram test
 | `COOKIE_DIR` | Per-user pyicloud session cookies |
 | `DEFAULT_SYNC_INTERVAL_SECONDS` | Default interval (21600 = 6h) |
 | `WEB_PORT` | Web UI and API port (default `8765`) |
+| `DB_VIEWER_PORT` | DB browser port on localhost only (default `8766`) |
+| `DB_VIEWER_ENABLED` | Set `0` to skip the db-viewer container (default `1`) |
+| `DB_VIEWER_PASSWORD` | Optional password for sqlite-web (Docker SQLite mode) |
 | Admin login | Created on first web visit (database only; not `.env`) |
 | Telegram | **Settings** in the web UI only (stored in the database, not `.env`) |
 | `IMMICH_SCAN_DEBOUNCE_SECONDS` | Global min seconds between Immich scans (default 120) |

@@ -38,7 +38,9 @@ export default function Settings() {
         immich_base_url: settings.immich_base_url,
         immich_scan_debounce_seconds: settings.immich_scan_debounce_seconds,
         google_oauth_client_id: settings.google_oauth_client_id,
-        debug_logging_enabled: settings.debug_logging_enabled,
+        logging_level:
+          settings.logging_level ??
+          (settings.debug_logging_enabled ? "DEBUG" : "OFF"),
       });
       setTokenInput("");
       setImmichApiKeyInput("");
@@ -57,7 +59,9 @@ export default function Settings() {
         google_oauth_client_secret: googleSecretInput || undefined,
       }),
     onSuccess: (updated) => {
-      setDebugLoggingEnabled(Boolean(updated.debug_logging_enabled));
+      const level =
+        updated.logging_level ?? (updated.debug_logging_enabled ? "DEBUG" : "OFF");
+      setDebugLoggingEnabled(level === "DEBUG");
       qc.invalidateQueries({ queryKey: ["settings"] });
       setTokenInput("");
       setImmichApiKeyInput("");
@@ -458,17 +462,33 @@ export default function Settings() {
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
           <h3 className="text-lg font-medium text-violet-300">{t("settings.loggingSection")}</h3>
           <FieldHelp>{t("settings.loggingHelp")}</FieldHelp>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={form.debug_logging_enabled ?? settings.debug_logging_enabled ?? false}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, debug_logging_enabled: e.target.checked }))
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">{t("settings.loggingLevel")}</label>
+            <select
+              value={
+                form.logging_level ??
+                settings.logging_level ??
+                (settings.debug_logging_enabled ? "DEBUG" : "OFF")
               }
-              className="rounded"
-            />
-            <span>{t("settings.debugLoggingEnabled")}</span>
-          </label>
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  logging_level: e.target.value,
+                  debug_logging_enabled: e.target.value === "DEBUG",
+                }))
+              }
+              className="w-full max-w-xs bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+            >
+              {(["OFF", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] as const).map(
+                (level) => (
+                  <option key={level} value={level}>
+                    {t(`settings.logLevel.${level}`)}
+                  </option>
+                )
+              )}
+            </select>
+            <FieldHelp>{t("settings.loggingLevelHelp")}</FieldHelp>
+          </div>
           <p className="text-slate-500 text-sm">
             <Link to="/logs" className="text-sky-400 hover:underline">
               {t("settings.viewLogs")}

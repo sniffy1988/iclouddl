@@ -166,6 +166,7 @@ class SyncRun(Base):
     photos_failed: Mapped[int] = mapped_column(Integer, default=0)
     photos_skipped: Mapped[int] = mapped_column(Integer, default=0)
     error_summary: Mapped[str | None] = mapped_column(Text)
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False)
 
     user: Mapped[User] = relationship(back_populates="sync_runs")
 
@@ -224,6 +225,7 @@ class RuntimeSettings(Base):
     google_oauth_client_id: Mapped[str] = mapped_column(String(512), default="")
     google_oauth_client_secret: Mapped[str] = mapped_column(String(512), default="")
     debug_logging_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    logging_level: Mapped[str] = mapped_column(String(16), default="OFF")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 

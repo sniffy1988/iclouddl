@@ -44,7 +44,8 @@ export default function Logs() {
         level: level || undefined,
         search: appliedSearch || undefined,
       }),
-    refetchInterval: settings?.debug_logging_enabled ? 5000 : false,
+    refetchInterval:
+      settings?.logging_level && settings.logging_level !== "OFF" ? 5000 : false,
   });
 
   const clear = useMutation({
@@ -58,7 +59,9 @@ export default function Logs() {
 
   if (isLoading) return <div>{t("common.loading")}</div>;
 
-  const loggingOff = !settings?.debug_logging_enabled;
+  const activeLogLevel =
+    settings?.logging_level ?? (settings?.debug_logging_enabled ? "DEBUG" : "OFF");
+  const loggingOff = activeLogLevel === "OFF";
 
   return (
     <div>

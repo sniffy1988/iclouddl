@@ -351,7 +351,17 @@
     "oauthSecretPlaceholder": "GOCSPX-… зі сторінки облікових даних",
     "oauthSecretHelp": "Показується один раз при створенні клієнта. Зберігайте лише тут (база), не в git.",
     "loggingSection": "Логування",
-    "loggingHelp": "Якщо увімкнено, повідомлення DEBUG зберігаються в базі (до 5000) і дублюються в консоль API/демона. Веб-інтерфейс також пише виклики API в консоль браузера.",
+    "loggingHelp": "Мінімальний рівень для БД (до 5000) і консолі API/демона. OFF вимикає збереження.",
+    "loggingLevel": "Рівень логування",
+    "loggingLevelHelp": "DEBUG — HTTP і трасування в консолі браузера. WARNING приховує INFO/DEBUG.",
+    "logLevel": {
+      "OFF": "Вимкнено — без запису в БД",
+      "DEBUG": "Debug — детально (вкл. HTTP)",
+      "INFO": "Info — звичайний",
+      "WARNING": "Warning і вище",
+      "ERROR": "Error і вище",
+      "CRITICAL": "Лише Critical"
+    },
     "debugLoggingEnabled": "Увімкнути відладкове логування (БД + консоль)",
     "viewLogs": "Перегляд журналу застосунку",
     "syncSection": "Синхронізація",

@@ -352,7 +352,17 @@
     "oauthSecretPlaceholder": "GOCSPX-… von derselben Credentials-Seite",
     "oauthSecretHelp": "Einmal beim Erstellen angezeigt. Nur hier (DB) speichern, nicht in Git.",
     "loggingSection": "Protokollierung",
-    "loggingHelp": "Wenn aktiviert, werden DEBUG-Meldungen in der Datenbank gespeichert (max. 5.000) und in der API-/Daemon-Konsole ausgegeben. Die Web-UI protokolliert API-Aufrufe in der Browser-Konsole.",
+    "loggingHelp": "Mindeststufe für Datenbank (max. 5.000) und API-/Daemon-Konsole. OFF deaktiviert die Speicherung.",
+    "loggingLevel": "Protokollstufe",
+    "loggingLevelHelp": "DEBUG aktiviert HTTP-Zeilen und Browser-Konsolen-Tracing. WARNING blendet INFO/DEBUG aus.",
+    "logLevel": {
+      "OFF": "Aus — keine DB-Logs",
+      "DEBUG": "Debug — ausführlich (inkl. HTTP)",
+      "INFO": "Info — normal",
+      "WARNING": "Warning und höher",
+      "ERROR": "Error und höher",
+      "CRITICAL": "Nur Critical"
+    },
     "debugLoggingEnabled": "Debug-Protokollierung aktivieren (Datenbank + Konsole)",
     "viewLogs": "Anwendungsprotokoll anzeigen",
     "syncSection": "Sync",

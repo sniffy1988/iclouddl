@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from iclouddownloader.config import get_settings
 from iclouddownloader.db.models import User
-from iclouddownloader.icloud.client import download_dir_for_user
+from iclouddownloader.paths import download_dir_for_user
 from iclouddownloader.providers.base import linked_providers
 
 
@@ -53,7 +53,12 @@ class UserService:
         self.db.flush()
         if not user.download_dir:
             user.download_dir = str(
-                download_dir_for_user(user.id, apple_id or f"user-{user.id}", custom_dir=None)
+                download_dir_for_user(
+                    user.id,
+                    apple_id=apple_id,
+                    display_name=label if not apple_id else None,
+                    custom_dir=None,
+                )
             )
         self.db.commit()
         self.db.refresh(user)

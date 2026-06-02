@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import queue
 import sys
 import threading
@@ -13,7 +14,27 @@ if TYPE_CHECKING:
     from logging import LogRecord
 
 LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+_RESET = "\033[0m"
+_DIM = "\033[2m"
+_BOLD = "\033[1m"
+_LEVEL_ANSI: dict[int, str] = {
+    logging.DEBUG: "\033[36m",  # cyan
+    logging.INFO: "\033[32m",  # green
+    logging.WARNING: "\033[33;1m",  # bold yellow
+    logging.ERROR: "\033[31;1m",  # bold red
+    logging.CRITICAL: "\033[35;1;7m",  # bold magenta, reverse video
+}
+_LOGGER_ANSI = "\033[34m"  # blue
 MAX_STORED_LOGS = 5000
+LOG_LEVEL_NAMES = ("OFF", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+_NAME_TO_LEVEL: dict[str, int] = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+}
+
 _db_queue: queue.Queue[dict] | None = None
 _db_worker: threading.Thread | None = None
 _configured = False
@@ -23,8 +44,32 @@ _QUIET_LOGGERS = ("httpx", "httpcore", "urllib3", "apscheduler", "telegram", "as
 
 @dataclass(frozen=True)
 class LoggingOptions:
-    debug_enabled: bool
+    level_name: str
+    console_level: int
+    db_level: int
     persist_to_db: bool
+
+    @property
+    def debug_enabled(self) -> bool:
+        return self.level_name == "DEBUG"
+
+
+def normalize_log_level(name: str | None) -> str:
+    if not name:
+        return "OFF"
+    key = str(name).strip().upper()
+    if key in _NAME_TO_LEVEL:
+        return key
+    if key == "OFF":
+        return "OFF"
+    return "OFF"
+
+
+def _level_from_settings_row(settings) -> str:
+    level = normalize_log_level(getattr(settings, "logging_level", None))
+    if level == "OFF" and bool(getattr(settings, "debug_logging_enabled", False)):
+        return "DEBUG"
+    return level
 
 
 def _read_options() -> LoggingOptions:
@@ -32,14 +77,42 @@ def _read_options() -> LoggingOptions:
         from iclouddownloader.services.runtime_settings_service import get_effective_settings
 
         settings = get_effective_settings()
-        enabled = bool(getattr(settings, "debug_logging_enabled", False))
-        return LoggingOptions(debug_enabled=enabled, persist_to_db=enabled)
+        level_name = _level_from_settings_row(settings)
     except Exception:
-        return LoggingOptions(debug_enabled=False, persist_to_db=False)
+        level_name = "OFF"
+
+    if level_name == "OFF":
+        return LoggingOptions(
+            level_name="OFF",
+            console_level=logging.INFO,
+            db_level=logging.INFO,
+            persist_to_db=False,
+        )
+
+    numeric = _NAME_TO_LEVEL[level_name]
+    return LoggingOptions(
+        level_name=level_name,
+        console_level=numeric,
+        db_level=numeric,
+        persist_to_db=True,
+    )
 
 
 def is_debug_logging_enabled() -> bool:
     return _read_options().debug_enabled
+
+
+def is_logging_enabled() -> bool:
+    return _read_options().persist_to_db
+
+
+def get_logging_level() -> str:
+    return _read_options().level_name
+
+
+def should_log_http_requests() -> bool:
+    opts = _read_options()
+    return opts.persist_to_db and opts.console_level <= logging.INFO
 
 
 def _ensure_db_worker() -> queue.Queue[dict]:
@@ -100,13 +173,52 @@ def _flush_log_batch(batch: list[dict]) -> None:
         logging.getLogger(__name__).exception("Failed to persist app logs to database")
 
 
+def console_use_color() -> bool:
+    """True when stderr should get ANSI colors (TTY, FORCE_COLOR; not NO_COLOR)."""
+    if os.environ.get("NO_COLOR"):
+        return False
+    if os.environ.get("ICLD_LOG_COLOR", "1").lower() in ("0", "false", "no"):
+        return False
+    if os.environ.get("FORCE_COLOR") or os.environ.get("CLICOLOR_FORCE"):
+        return True
+    try:
+        return sys.stderr.isatty()
+    except Exception:
+        return False
+
+
+class ColoredConsoleFormatter(logging.Formatter):
+    """ANSI-colored console lines; plain text when use_color is False."""
+
+    def __init__(self, *, use_color: bool = True, datefmt: str = "%Y-%m-%d %H:%M:%S") -> None:
+        super().__init__(datefmt=datefmt)
+        self._use_color = use_color
+
+    def format(self, record: LogRecord) -> str:
+        ts = self.formatTime(record, self.datefmt)
+        message = record.getMessage()
+        if not self._use_color:
+            line = f"{ts} {record.levelname} [{record.name}] {message}"
+        else:
+            color = _LEVEL_ANSI.get(record.levelno, "")
+            level = f"{color}{_BOLD}{record.levelname:<8}{_RESET}"
+            logger_part = f"{_LOGGER_ANSI}[{record.name}]{_RESET}"
+            line = f"{_DIM}{ts}{_RESET} {level} {logger_part} {message}"
+        if record.exc_info:
+            line += "\n" + self.formatException(record.exc_info)
+        elif record.exc_text:
+            line += "\n" + record.exc_text
+        return line
+
+
 class DatabaseLogHandler(logging.Handler):
-    """Async queue writer; only emits when debug logging is enabled in settings."""
+    """Async queue writer when logging_level is not OFF."""
 
     def emit(self, record: LogRecord) -> None:
-        if not _read_options().persist_to_db:
+        opts = _read_options()
+        if not opts.persist_to_db:
             return
-        if record.levelno < logging.INFO and not _read_options().debug_enabled:
+        if record.levelno < opts.db_level:
             return
         try:
             message = record.getMessage()
@@ -140,26 +252,26 @@ def configure_logging(force: bool = False) -> LoggingOptions:
     root = logging.getLogger()
     root.handlers.clear()
 
-    console_level = logging.DEBUG if opts.debug_enabled else logging.INFO
     console = logging.StreamHandler(sys.stderr)
-    console.setLevel(console_level)
-    console.setFormatter(logging.Formatter(LOG_FORMAT))
+    console.setLevel(opts.console_level)
+    console.setFormatter(ColoredConsoleFormatter(use_color=console_use_color()))
     root.addHandler(console)
 
     if opts.persist_to_db:
         db_handler = DatabaseLogHandler()
-        db_handler.setLevel(logging.DEBUG if opts.debug_enabled else logging.INFO)
+        db_handler.setLevel(opts.db_level)
         root.addHandler(db_handler)
-
-    root.setLevel(logging.DEBUG if opts.debug_enabled else logging.INFO)
+        root.setLevel(opts.db_level)
+    else:
+        root.setLevel(opts.console_level)
 
     for name in _QUIET_LOGGERS:
         logging.getLogger(name).setLevel(logging.WARNING)
 
     _configured = True
     root.info(
-        "Logging configured (debug=%s, db=%s)",
-        opts.debug_enabled,
+        "Logging configured (level=%s, db=%s)",
+        opts.level_name,
         opts.persist_to_db,
     )
     return opts

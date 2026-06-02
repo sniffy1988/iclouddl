@@ -11,6 +11,7 @@ from iclouddownloader.api.schemas import (
     UserICloudLoginResponse,
     FetchCountResponse,
     PhotoCountResponse,
+    CancelSyncResponse,
     TriggerSyncResponse,
     UserCreate,
     UserResponse,
@@ -283,6 +284,21 @@ def trigger_sync(
         source=source,
         scope=scope.value,
     )
+
+
+@router.post("/{user_id}/sync/cancel", response_model=CancelSyncResponse)
+def cancel_sync(
+    user_id: int,
+    source: PhotoSourceParam | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_auth),
+):
+    photo_source = PhotoSource(source) if source else None
+    try:
+        result = SyncService(db).request_cancel_sync(user_id, photo_source)
+    except ValueError as e:
+        raise HTTPException(404, str(e)) from e
+    return CancelSyncResponse(**result)
 
 
 @router.post("/{user_id}/auth/login", response_model=UserICloudLoginResponse)

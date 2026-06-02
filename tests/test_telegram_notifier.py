@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from iclouddownloader.telegram.notifier import TelegramNotifier
 
@@ -28,7 +28,7 @@ def test_notifier_daemon_alerts_disabled(_mock):
 def test_test_bot_token_getme(mock_client_cls, _mock_settings):
     mock_resp = MagicMock()
     mock_resp.is_success = True
-    mock_client_cls.return_value.__aenter__.return_value.get = MagicMock(
+    mock_client_cls.return_value.__aenter__.return_value.get = AsyncMock(
         return_value=mock_resp
     )
 

@@ -9,7 +9,11 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from iclouddownloader.api.routes import auth, google_auth, logs, photos, settings, sync, users
-from iclouddownloader.logging_setup import configure_logging, is_debug_logging_enabled
+from iclouddownloader.logging_setup import (
+    configure_logging,
+    get_logging_level,
+    should_log_http_requests,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +37,7 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def request_logging_middleware(request: Request, call_next):
-        if not is_debug_logging_enabled():
+        if not should_log_http_requests():
             return await call_next(request)
         start = time.perf_counter()
         response = await call_next(request)
@@ -57,7 +61,11 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health")
     def health():
-        return {"status": "ok", "debug_logging_enabled": is_debug_logging_enabled()}
+        return {
+            "status": "ok",
+            "logging_level": get_logging_level(),
+            "debug_logging_enabled": get_logging_level() == "DEBUG",
+        }
 
     web_dist = Path(__file__).resolve().parents[3] / "web" / "dist"
     if web_dist.exists():

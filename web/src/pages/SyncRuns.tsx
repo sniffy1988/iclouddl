@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import StopSyncButton from "../components/StopSyncButton";
 import SyncNowButton from "../components/SyncNowButton";
 
 export default function SyncRuns() {
@@ -64,9 +65,22 @@ export default function SyncRuns() {
                 {r.error_summary || t("common.dash")}
               </td>
               <td className="py-3">
-                {r.status !== "running" && (
-                  <SyncNowButton userId={r.user_id} size="sm" />
-                )}
+                <div className="flex flex-wrap gap-2">
+                  {r.status === "running" && (
+                    <StopSyncButton
+                      userId={r.user_id}
+                      source={
+                        r.scope === "icloud" || r.scope === "google_photos"
+                          ? r.scope
+                          : undefined
+                      }
+                      size="sm"
+                    />
+                  )}
+                  {r.status !== "running" && (
+                    <SyncNowButton userId={r.user_id} size="sm" />
+                  )}
+                </div>
               </td>
             </tr>
           ))}

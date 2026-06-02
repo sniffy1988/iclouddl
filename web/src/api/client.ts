@@ -142,6 +142,14 @@ export interface TriggerDueResult {
   message: string;
 }
 
+export interface CancelSyncResult {
+  ok: boolean;
+  message: string;
+  user_id: number;
+  source?: string | null;
+  cancelled_run_ids: number[];
+}
+
 export interface SettingsData {
   telegram_enabled: boolean;
   telegram_bot_token_set: boolean;
@@ -164,6 +172,7 @@ export interface SettingsData {
   google_oauth_redirect_uri?: string;
   token_encryption_key_set?: boolean;
   debug_logging_enabled?: boolean;
+  logging_level?: string;
 }
 
 export interface AppLogEntry {
@@ -228,6 +237,10 @@ export const api = {
   triggerSync: (id: number, source?: PhotoSource) => {
     const q = source ? `?source=${source}` : "";
     return request<TriggerSyncResult>(`/users/${id}/sync${q}`, { method: "POST" });
+  },
+  cancelSync: (id: number, source?: PhotoSource) => {
+    const q = source ? `?source=${source}` : "";
+    return request<CancelSyncResult>(`/users/${id}/sync/cancel${q}`, { method: "POST" });
   },
   fetchPhotoCount: (id: number, source: PhotoSource) =>
     request<{ ok: boolean; message: string; already_running?: boolean }>(

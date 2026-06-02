@@ -22,6 +22,7 @@ from iclouddownloader.providers.base import (
     scope_for_source,
     sync_scope_conflicts,
 )
+from iclouddownloader.providers.cancel import run_matches_cancel_scope
 from iclouddownloader.providers.orchestrator import run_all_providers_parallel
 from iclouddownloader.services.auth_service import AuthService
 from iclouddownloader.services.google_auth_service import GoogleAuthService
@@ -211,14 +212,20 @@ class SyncService:
             "updated_at": user.updated_at,
         }
 
-    def _event(self, user: User, event_type: str, source: PhotoSource | None = None, **payload):
+    def _event(
+        self,
+        user: User,
+        event_type: str,
+        photo_source: PhotoSource | None = None,
+        **payload,
+    ):
         get_event_bus().publish(
             SyncEvent(
                 type=event_type,
                 user_id=user.id,
                 apple_id=user.apple_id,
                 account_label=account_label(user),
-                source=source.value if source else None,
+                source=photo_source.value if photo_source else None,
                 payload=payload,
             )
         )
@@ -374,6 +381,46 @@ class SyncService:
 
         self.user_service.schedule_next_sync(user)
         return sync_run
+
+    def request_cancel_sync(
+        self,
+        user_id: int,
+        source: PhotoSource | None = None,
+    ) -> dict:
+        user = self.user_service.get_user(user_id)
+        if not user:
+            raise ValueError(f"User {user_id} not found")
+
+        run_ids: list[int] = []
+        for run in self.get_active_sync_runs(user_id):
+            if run_matches_cancel_scope(run, source):
+                run.cancel_requested = True
+                run_ids.append(run.id)
+
+        cleared_queue = user.last_sync_status in ("queued", "syncing")
+        if cleared_queue and not run_ids:
+            user.last_sync_status = "idle"
+        elif cleared_queue:
+            user.last_sync_status = "idle"
+
+        self.db.commit()
+
+        if run_ids:
+            message = f"Stopping sync (run {run_ids[0]})" if len(run_ids) == 1 else (
+                f"Stopping {len(run_ids)} sync runs"
+            )
+        elif cleared_queue:
+            message = "Queued sync cleared"
+        else:
+            message = "No active sync to stop"
+
+        return {
+            "ok": bool(run_ids or cleared_queue),
+            "message": message,
+            "user_id": user_id,
+            "source": source.value if source else None,
+            "cancelled_run_ids": run_ids,
+        }
 
     def list_sync_runs(
         self,
