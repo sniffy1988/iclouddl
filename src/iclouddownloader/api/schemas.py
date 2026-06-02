@@ -20,11 +20,12 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     display_name: str | None = None
-    download_dir: str | None = None
-    sync_interval_seconds: int | None = None
+    download_dir: str | None = Field(default=None, min_length=1, max_length=1024)
+    sync_interval_seconds: int | None = Field(default=None, ge=300, le=2_592_000)
     enabled: bool | None = None
     library_key: str | None = None
     telegram_notify: bool | None = None
+    reschedule_sync: bool | None = None
 
 
 class UserResponse(BaseModel):

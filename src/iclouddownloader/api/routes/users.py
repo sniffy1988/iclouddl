@@ -126,7 +126,8 @@ def update_user(
     _: None = Depends(require_auth),
 ):
     try:
-        user = UserService(db).update_user(user_id, **body.model_dump(exclude_unset=True))
+        payload = body.model_dump(exclude_unset=True)
+        user = UserService(db).update_user(user_id, **payload)
         return SyncService(db).user_to_response(user)
     except ValueError as e:
         raise HTTPException(404, str(e)) from e

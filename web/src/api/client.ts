@@ -143,7 +143,10 @@ export const api = {
     request<{ ok: boolean; queued: number[]; message: string }>("/users/fetch-all-counts", {
       method: "POST",
     }),
-  updateUser: (id: number, data: Partial<User>) =>
+  updateUser: (
+    id: number,
+    data: Partial<User> & { reschedule_sync?: boolean }
+  ) =>
     request<User>(`/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteUser: (id: number) => request<void>(`/users/${id}`, { method: "DELETE" }),
   triggerSync: (id: number) =>

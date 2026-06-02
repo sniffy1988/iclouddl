@@ -2,14 +2,15 @@
 
 Pushes to `main` build a Docker image, push it to **GitHub Container Registry (GHCR)**, and deploy to your server over SSH.
 
-## 1. Create the GitHub repository
+## 1. GitHub repository
 
-From the project root (after the initial commit):
+Remote: https://github.com/sniffy1988/iclouddl.git
 
 ```bash
-gh repo create iclouddownloader --private --source=. --remote=origin --push
-# or public: gh repo create iclouddownloader --public --source=. --remote=origin --push
+git push -u origin main
 ```
+
+Container image: `ghcr.io/sniffy1988/iclouddl:latest`
 
 ## 2. Server setup (one time)
 
@@ -63,7 +64,7 @@ Keep `.env` and `./data/` only on the server — they are not overwritten by CI.
 ## Manual deploy on the server
 
 ```bash
-export DOCKER_IMAGE=ghcr.io/YOUR_USER/iclouddownloader:latest
+export DOCKER_IMAGE=ghcr.io/sniffy1988/iclouddl:latest
 docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```

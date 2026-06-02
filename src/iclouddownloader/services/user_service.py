@@ -55,9 +55,28 @@ class UserService:
         user = self.get_user(user_id)
         if not user:
             raise ValueError(f"User {user_id} not found")
+
+        reschedule = bool(kwargs.pop("reschedule_sync", False))
+        interval_changed = False
+        was_enabled = user.enabled
+
         for key, value in kwargs.items():
-            if hasattr(user, key) and value is not None:
-                setattr(user, key, value)
+            if not hasattr(user, key):
+                continue
+            if value is None:
+                continue
+            if key == "sync_interval_seconds":
+                interval_changed = True
+            setattr(user, key, value)
+
+        if user.enabled and not was_enabled and user.next_sync_at is None:
+            user.next_sync_at = datetime.now(timezone.utc)
+
+        if user.enabled and (reschedule or interval_changed):
+            user.next_sync_at = datetime.now(timezone.utc) + timedelta(
+                seconds=user.sync_interval_seconds
+            )
+
         self.db.commit()
         self.db.refresh(user)
         return user

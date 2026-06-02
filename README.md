@@ -187,7 +187,8 @@ pytest
 Setup: create the repo, add deploy secrets, and follow [deploy/README.md](deploy/README.md).
 
 ```bash
-gh repo create iclouddownloader --private --source=. --remote=origin --push
+git remote add origin https://github.com/sniffy1988/iclouddl.git
+git push -u origin main
 ```
 
 ## License

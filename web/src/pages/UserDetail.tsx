@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import AuthorizeButton from "../components/AuthorizeButton";
@@ -6,6 +7,32 @@ import { format2faDaysLeft } from "../utils/format2fa";
 import StatusPill from "../components/StatusPill";
 import FetchCountButton from "../components/FetchCountButton";
 import SyncNowButton from "../components/SyncNowButton";
+import {
+  SYNC_INTERVAL_PRESETS,
+  formatSyncInterval,
+  hoursToSeconds,
+  presetForSeconds,
+  secondsToHours,
+} from "../utils/syncSchedule";
+
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+      <h3 className="font-medium text-slate-200">{title}</h3>
+      {description && <p className="text-slate-500 text-sm mt-1 mb-4">{description}</p>}
+      {!description && <div className="mb-4" />}
+      {children}
+    </section>
+  );
+}
 
 export default function UserDetail() {
   const { id } = useParams<{ id: string }>();
@@ -43,9 +70,51 @@ export default function UserDetail() {
       user?.activity_status === "syncing" || user?.activity_status === "queued" ? 3000 : false,
   });
 
-  const toggle = useMutation({
-    mutationFn: (enabled: boolean) => api.updateUser(userId, { enabled }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["user", userId] }),
+  const [displayName, setDisplayName] = useState("");
+  const [downloadDir, setDownloadDir] = useState("");
+  const [intervalPreset, setIntervalPreset] = useState("21600");
+  const [customHours, setCustomHours] = useState("6");
+  const [scheduledEnabled, setScheduledEnabled] = useState(true);
+  const [telegramNotify, setTelegramNotify] = useState(true);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveOk, setSaveOk] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    setDisplayName(user.display_name ?? "");
+    setDownloadDir(user.download_dir);
+    setIntervalPreset(presetForSeconds(user.sync_interval_seconds));
+    setCustomHours(String(secondsToHours(user.sync_interval_seconds)));
+    setScheduledEnabled(user.enabled);
+    setTelegramNotify(user.telegram_notify);
+  }, [user]);
+
+  const saveSettings = useMutation({
+    mutationFn: (opts?: { reschedule_sync?: boolean }) => {
+      const seconds =
+        intervalPreset === "custom"
+          ? hoursToSeconds(parseFloat(customHours) || 6)
+          : Number(intervalPreset);
+      return api.updateUser(userId, {
+        display_name: displayName.trim() || user!.apple_id,
+        download_dir: downloadDir.trim(),
+        sync_interval_seconds: seconds,
+        enabled: scheduledEnabled,
+        telegram_notify: telegramNotify,
+        reschedule_sync: opts?.reschedule_sync,
+      });
+    },
+    onSuccess: () => {
+      setSaveError(null);
+      setSaveOk(true);
+      setTimeout(() => setSaveOk(false), 3000);
+      qc.invalidateQueries({ queryKey: ["user", userId] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (err: Error) => {
+      setSaveOk(false);
+      setSaveError(err.message);
+    },
   });
 
   if (!user) return <div>Loading...</div>;
@@ -55,18 +124,31 @@ export default function UserDetail() {
     user.activity_status === "syncing" ||
     user.activity_status === "counting";
 
-  const isCounting = user?.activity_status === "counting";
+  const isCounting = user.activity_status === "counting";
   const remaining = isCounting ? null : counts?.remaining_to_download ?? null;
 
+  const syncIntervalSeconds =
+    intervalPreset === "custom"
+      ? hoursToSeconds(parseFloat(customHours) || 6)
+      : Number(intervalPreset);
+
   return (
-    <div>
+    <div className="max-w-5xl">
       <div className="flex items-center gap-3 mb-2">
         <Link to="/users" className="text-slate-500 hover:text-slate-300 text-sm">
           ← Users
         </Link>
       </div>
-      <h2 className="text-2xl font-semibold mb-2">{user.apple_id}</h2>
-      <p className="text-slate-500 mb-4">{user.display_name}</p>
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-semibold">{user.apple_id}</h2>
+          <p className="text-slate-500 text-sm mt-1">User #{user.id} · manage schedule, storage, and iCloud</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill variant="auth" status={user.auth_status} />
+          <StatusPill variant="activity" status={user.activity_status} />
+        </div>
+      </div>
 
       {isActive && (
         <div className="bg-sky-900/30 border border-sky-700 rounded-xl p-4 mb-6 flex items-center gap-3">
@@ -79,95 +161,193 @@ export default function UserDetail() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <StatusPill variant="auth" status={user.auth_status} />
-        <StatusPill variant="activity" status={user.activity_status} />
-        {user.icloud_2fa_at && (
-          <span className="text-slate-500 text-sm whitespace-nowrap">
-            2FA left: {format2faDaysLeft(user.days_until_2fa_expires)}
-          </span>
-        )}
-      </div>
-
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <div className="grid md:grid-cols-3 gap-4 mb-6">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <p className="text-slate-500 text-sm">iCloud photos</p>
           <p className="text-2xl font-semibold mt-1">
             {isCounting
               ? (user.icloud_photos_count ?? 0).toLocaleString()
-              : (user.icloud_photos_count ?? "—")}
+              : (user.icloud_photos_count?.toLocaleString() ?? "—")}
           </p>
-          {isCounting && (
-            <p className="text-xs text-sky-400 mt-1">Indexing iCloud library…</p>
-          )}
-          {user.icloud_photos_count_at && (
-            <p className="text-xs text-slate-500 mt-1">
-              {new Date(user.icloud_photos_count_at).toLocaleString()}
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <p className="text-slate-500 text-sm">Downloaded</p>
+          <p className="text-2xl font-semibold mt-1">{counts?.downloaded_count ?? 0}</p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <p className="text-slate-500 text-sm">Remaining</p>
+          <p className="text-2xl font-semibold mt-1">{isCounting ? "…" : (remaining ?? "—")}</p>
+        </div>
+      </div>
+
+      <div className="space-y-6 mb-8">
+        <Section
+          title="iCloud sign-in"
+          description="Authorize once with password and 2FA. The worker reuses the saved session until it expires."
+        >
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <AuthorizeButton
+              userId={userId}
+              appleId={user.apple_id}
+              icloudAuthorized={user.icloud_authorized}
+              icloudNeedsAuth={user.icloud_needs_auth}
+            />
+            {user.icloud_2fa_at && (
+              <span className="text-slate-400 text-sm">
+                Trusted session: {format2faDaysLeft(user.days_until_2fa_expires)}
+              </span>
+            )}
+          </div>
+          {user.icloud_authenticated_at && (
+            <p className="text-xs text-slate-500">
+              Last sign-in: {new Date(user.icloud_authenticated_at).toLocaleString()}
             </p>
           )}
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p className="text-slate-500 text-sm">Downloaded locally</p>
-          <p className="text-2xl font-semibold mt-1">
-            {counts?.downloaded_count ?? "—"}
-          </p>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p className="text-slate-500 text-sm">Remaining to download</p>
-          <p className="text-2xl font-semibold mt-1">
-            {isCounting ? "…" : (remaining ?? "—")}
-          </p>
-        </div>
-      </div>
+        </Section>
 
-      <div className="grid md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p className="text-slate-500 text-sm">Last sync</p>
-          <p className="mt-1 text-sm">
-            {user.last_sync_at ? new Date(user.last_sync_at).toLocaleString() : "—"}
-          </p>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p className="text-slate-500 text-sm">Next scheduled</p>
-          <p className="mt-1 text-sm">
-            {user.next_sync_at ? new Date(user.next_sync_at).toLocaleString() : "—"}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-4 mb-6">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p className="text-slate-500 text-sm">Download dir</p>
-          <p className="font-mono text-sm mt-1 break-all">{user.download_dir}</p>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p className="text-slate-500 text-sm">Sync interval</p>
-          <p className="mt-1">{Math.round(user.sync_interval_seconds / 3600)} hours</p>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-3 mb-8 items-center">
-        <AuthorizeButton
-          userId={userId}
-          appleId={user.apple_id}
-          icloudAuthorized={user.icloud_authorized}
-          icloudNeedsAuth={user.icloud_needs_auth}
-        />
-        <FetchCountButton userId={userId} disabled={!user.enabled} />
-        <SyncNowButton
-          userId={userId}
-          appleId={user.apple_id}
-          disabled={!user.enabled}
-        />
-        <button
-          onClick={() => toggle.mutate(!user.enabled)}
-          className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm"
+        <Section
+          title="Sync schedule"
+          description="The background worker runs a full download on this interval when scheduling is enabled."
         >
-          {user.enabled ? "Disable user" : "Enable user"}
-        </button>
-        {!user.enabled && (
-          <span className="text-slate-500 text-sm">Enable user to run sync</span>
-        )}
+          <div className="grid sm:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Interval</label>
+              <select
+                value={intervalPreset}
+                onChange={(e) => setIntervalPreset(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+              >
+                {SYNC_INTERVAL_PRESETS.map((p) => (
+                  <option key={p.seconds} value={String(p.seconds)}>
+                    {p.label}
+                  </option>
+                ))}
+                <option value="custom">Custom (hours)</option>
+              </select>
+            </div>
+            {intervalPreset === "custom" && (
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Hours between syncs</label>
+                <input
+                  type="number"
+                  min={0.083}
+                  step={0.5}
+                  value={customHours}
+                  onChange={(e) => setCustomHours(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                />
+                <p className="text-xs text-slate-500 mt-1">Minimum 5 minutes (0.083 h)</p>
+              </div>
+            )}
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-slate-300 mb-4 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={scheduledEnabled}
+              onChange={(e) => setScheduledEnabled(e.target.checked)}
+              className="rounded"
+            />
+            Scheduled sync enabled
+          </label>
+
+          <dl className="grid sm:grid-cols-2 gap-3 text-sm mb-4">
+            <div className="bg-slate-800/50 rounded-lg px-3 py-2">
+              <dt className="text-slate-500">Current interval</dt>
+              <dd className="text-slate-200 mt-0.5">{formatSyncInterval(syncIntervalSeconds)}</dd>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg px-3 py-2">
+              <dt className="text-slate-500">Next scheduled sync</dt>
+              <dd className="text-slate-200 mt-0.5">
+                {scheduledEnabled && user.next_sync_at
+                  ? new Date(user.next_sync_at).toLocaleString()
+                  : scheduledEnabled
+                    ? "Soon"
+                    : "— (disabled)"}
+              </dd>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg px-3 py-2">
+              <dt className="text-slate-500">Last sync</dt>
+              <dd className="text-slate-200 mt-0.5">
+                {user.last_sync_at ? new Date(user.last_sync_at).toLocaleString() : "—"}
+              </dd>
+            </div>
+          </dl>
+        </Section>
+
+        <Section
+          title="Storage & profile"
+          description="Photos are saved under the download directory using the global path template from Settings."
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Display name</label>
+              <input
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Download directory</label>
+              <input
+                value={downloadDir}
+                onChange={(e) => setDownloadDir(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Absolute path on the server where this user&apos;s files are stored.
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={telegramNotify}
+                onChange={(e) => setTelegramNotify(e.target.checked)}
+                className="rounded"
+              />
+              Telegram notifications for this user
+            </label>
+          </div>
+        </Section>
+
+        <Section title="Actions" description="Manual operations — they do not change the schedule.">
+          <div className="flex flex-wrap gap-3">
+            <FetchCountButton userId={userId} disabled={!user.enabled} />
+            <SyncNowButton
+              userId={userId}
+              appleId={user.apple_id}
+              disabled={
+                !user.enabled || !user.icloud_authorized || user.icloud_needs_auth
+              }
+            />
+          </div>
+          <p className="text-slate-500 text-xs mt-3">
+            Fetch count indexes iCloud metadata into the database. Sync now downloads files immediately.
+          </p>
+        </Section>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => saveSettings.mutate({})}
+            disabled={saveSettings.isPending || !downloadDir.trim()}
+            className="bg-sky-600 hover:bg-sky-500 disabled:opacity-50 px-5 py-2 rounded-lg text-sm font-medium"
+          >
+            {saveSettings.isPending ? "Saving…" : "Save settings"}
+          </button>
+          <button
+            type="button"
+            onClick={() => saveSettings.mutate({ reschedule_sync: true })}
+            disabled={saveSettings.isPending || !scheduledEnabled}
+            className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 px-4 py-2 rounded-lg text-sm"
+            title="Set next sync to now + interval"
+          >
+            Reset next sync time
+          </button>
+          {saveOk && <span className="text-emerald-400 text-sm">Saved</span>}
+          {saveError && <span className="text-red-400 text-sm">{saveError}</span>}
+        </div>
       </div>
 
       <h3 className="font-medium mb-3">Recent sync runs</h3>
@@ -179,7 +359,6 @@ export default function UserDetail() {
             <th className="text-left py-2">Downloaded</th>
             <th className="text-left py-2">Failed</th>
             <th className="text-left py-2">Started</th>
-            <th className="text-left py-2"></th>
           </tr>
         </thead>
         <tbody>
@@ -189,20 +368,13 @@ export default function UserDetail() {
               <td className="py-2 capitalize">{r.status}</td>
               <td className="py-2">{r.photos_downloaded}</td>
               <td className="py-2">{r.photos_failed}</td>
-              <td className="py-2 text-slate-500">
-                {new Date(r.started_at).toLocaleString()}
-              </td>
-              <td className="py-2">
-                {(r.status === "failed" || r.status === "completed") && (
-                  <SyncNowButton userId={userId} size="sm" />
-                )}
-              </td>
+              <td className="py-2 text-slate-500">{new Date(r.started_at).toLocaleString()}</td>
             </tr>
           ))}
         </tbody>
       </table>
       {(!syncRuns || syncRuns.length === 0) && (
-        <p className="text-slate-500 text-sm mb-8">No sync runs yet — use Sync now to start.</p>
+        <p className="text-slate-500 text-sm mb-8">No sync runs yet.</p>
       )}
 
       <h3 className="font-medium mb-3">Recent photos ({photos?.length ?? 0})</h3>

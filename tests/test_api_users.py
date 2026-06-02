@@ -60,6 +60,15 @@ def test_login_and_users_crud():
     r = client.get(f"/api/users/{user['id']}")
     assert r.status_code == 200
 
+    r = client.patch(
+        f"/api/users/{user['id']}",
+        json={"sync_interval_seconds": 3600, "reschedule_sync": True},
+    )
+    assert r.status_code == 200
+    updated = r.json()
+    assert updated["sync_interval_seconds"] == 3600
+    assert updated["next_sync_at"] is not None
+
     r = client.delete(f"/api/users/{user['id']}")
     assert r.status_code == 204
 

@@ -7,6 +7,7 @@ import { format2faDaysLeft } from "../utils/format2fa";
 import FetchCountButton from "../components/FetchCountButton";
 import StatusPill from "../components/StatusPill";
 import SyncNowButton from "../components/SyncNowButton";
+import { formatSyncInterval } from "../utils/syncSchedule";
 
 export default function Users() {
   const qc = useQueryClient();
@@ -108,6 +109,7 @@ export default function Users() {
               <th className="text-right py-2 pr-4">iCloud photos</th>
               <th className="text-right py-2 pr-4">Downloaded</th>
               <th className="text-right py-2 pr-4">Remaining</th>
+              <th className="text-left py-2 pr-4">Schedule</th>
               <th className="text-left py-2 pr-4">Last sync</th>
               <th className="text-left py-2">Actions</th>
             </tr>
@@ -116,7 +118,11 @@ export default function Users() {
             {users?.map((u) => (
               <tr key={u.id} className="border-b border-slate-800/50 hover:bg-slate-900/50">
                 <td className="py-3 pr-4">
-                  <Link to={`/users/${u.id}`} className="text-sky-400 hover:underline font-medium">
+                  <Link
+                    to={`/users/${u.id}`}
+                    className="text-sky-400 hover:underline font-medium"
+                    title="Manage user"
+                  >
                     {u.apple_id}
                   </Link>
                   {!u.enabled && (
@@ -153,6 +159,23 @@ export default function Users() {
                     u.remaining_to_download.toLocaleString()
                   ) : (
                     "—"
+                  )}
+                </td>
+                <td className="py-3 pr-4 text-slate-500 text-xs whitespace-nowrap">
+                  {u.enabled ? (
+                    <>
+                      <span className="text-slate-400">{formatSyncInterval(u.sync_interval_seconds)}</span>
+                      <br />
+                      {u.next_sync_at ? (
+                        <span title="Next scheduled sync">
+                          Next {new Date(u.next_sync_at).toLocaleString()}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-amber-500/80">Off</span>
                   )}
                 </td>
                 <td className="py-3 pr-4 text-slate-500 whitespace-nowrap">
