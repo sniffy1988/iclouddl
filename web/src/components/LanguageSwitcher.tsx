@@ -1,13 +1,16 @@
 import { useTranslation } from "react-i18next";
-import { LANGUAGE_STORAGE_KEY, SUPPORTED_LANGUAGES, type SupportedLanguage } from "../i18n";
+import {
+  LANGUAGE_STORAGE_KEY,
+  SUPPORTED_LANGUAGES,
+  normalizeLanguage,
+  type SupportedLanguage,
+} from "../i18n";
 
 type Props = { compact?: boolean };
 
 export default function LanguageSwitcher({ compact = false }: Props) {
   const { i18n, t } = useTranslation();
-  const current = (SUPPORTED_LANGUAGES.includes(i18n.language as SupportedLanguage)
-    ? i18n.language
-    : "en") as SupportedLanguage;
+  const current = normalizeLanguage(i18n.language);
 
   const change = (lng: SupportedLanguage) => {
     void i18n.changeLanguage(lng);

@@ -12,7 +12,9 @@
   "language": {
     "label": "Язык",
     "en": "English",
-    "ru": "Русский"
+    "de": "Deutsch",
+    "ru": "Русский",
+    "ua": "Українська"
   },
   "common": {
     "loading": "Загрузка...",
