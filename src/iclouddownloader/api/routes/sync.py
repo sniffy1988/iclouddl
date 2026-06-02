@@ -11,7 +11,7 @@ from iclouddownloader.db.models import SyncRunStatus
 from iclouddownloader.events import get_event_bus
 from iclouddownloader.services.sync_service import SyncInProgressError, SyncService
 from iclouddownloader.services.user_service import UserService
-from iclouddownloader.telegram.notifier import TelegramNotifier
+from iclouddownloader.notifications import AppNotifier
 
 router = APIRouter(tags=["sync"])
 
@@ -43,7 +43,7 @@ def trigger_due_syncs(
     """Manually trigger sync for all enabled users that are due."""
     sync_svc = SyncService(db)
     user_svc = UserService(db)
-    notifier = TelegramNotifier()
+    notifier = AppNotifier()
     queued: list[int] = []
     skipped: list[int] = []
 

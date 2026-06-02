@@ -25,6 +25,8 @@ class UserUpdate(BaseModel):
     enabled: bool | None = None
     library_key: str | None = None
     telegram_notify: bool | None = None
+    immich_library_id: str | None = None
+    immich_scan_after_sync: bool | None = None
     reschedule_sync: bool | None = None
 
 
@@ -53,6 +55,8 @@ class UserResponse(BaseModel):
     icloud_authorized: bool = False
     icloud_2fa_expires_at: datetime | None = None
     days_until_2fa_expires: int | None = None
+    immich_library_id: str | None = None
+    immich_scan_after_sync: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -164,6 +168,15 @@ class SettingsResponse(BaseModel):
     max_concurrent_downloads: int
     scheduler_poll_seconds: int
     base_download_dir: str
+    immich_enabled: bool = False
+    immich_base_url: str = ""
+    immich_api_key_set: bool = False
+    immich_api_key_masked: str = ""
+    immich_scan_debounce_seconds: int = 120
+
+
+class ImmichTestRequest(BaseModel):
+    library_id: str | None = None
 
 
 class SettingsUpdate(BaseModel):
@@ -175,3 +188,7 @@ class SettingsUpdate(BaseModel):
     default_sync_interval_seconds: int | None = Field(default=None, ge=300)
     max_concurrent_downloads: int | None = Field(default=None, ge=1, le=32)
     scheduler_poll_seconds: int | None = Field(default=None, ge=10, le=3600)
+    immich_enabled: bool | None = None
+    immich_base_url: str | None = None
+    immich_api_key: str | None = None
+    immich_scan_debounce_seconds: int | None = Field(default=None, ge=0, le=3600)

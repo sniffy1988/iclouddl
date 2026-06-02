@@ -72,6 +72,8 @@ class User(Base):
     icloud_2fa_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     icloud_session_ok_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     icloud_needs_auth: Mapped[bool] = mapped_column(Boolean, default=True)
+    immich_library_id: Mapped[str | None] = mapped_column(String(36))
+    immich_scan_after_sync: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -188,6 +190,10 @@ class RuntimeSettings(Base):
     default_sync_interval_seconds: Mapped[int] = mapped_column(Integer, default=21600)
     max_concurrent_downloads: Mapped[int] = mapped_column(Integer, default=3)
     scheduler_poll_seconds: Mapped[int] = mapped_column(Integer, default=60)
+    immich_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    immich_base_url: Mapped[str] = mapped_column(String(512), default="")
+    immich_api_key: Mapped[str] = mapped_column(String(512), default="")
+    immich_scan_debounce_seconds: Mapped[int] = mapped_column(Integer, default=120)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 

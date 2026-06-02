@@ -14,6 +14,7 @@ export default function Settings() {
 
   const [form, setForm] = useState<Partial<SettingsData>>({});
   const [tokenInput, setTokenInput] = useState("");
+  const [immichApiKeyInput, setImmichApiKeyInput] = useState("");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -26,8 +27,12 @@ export default function Settings() {
         default_sync_interval_seconds: settings.default_sync_interval_seconds,
         max_concurrent_downloads: settings.max_concurrent_downloads,
         scheduler_poll_seconds: settings.scheduler_poll_seconds,
+        immich_enabled: settings.immich_enabled,
+        immich_base_url: settings.immich_base_url,
+        immich_scan_debounce_seconds: settings.immich_scan_debounce_seconds,
       });
       setTokenInput("");
+      setImmichApiKeyInput("");
     }
   }, [settings]);
 
@@ -36,17 +41,19 @@ export default function Settings() {
       api.updateSettings({
         ...form,
         telegram_bot_token: tokenInput || undefined,
+        immich_api_key: immichApiKeyInput || undefined,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
       setTokenInput("");
+      setImmichApiKeyInput("");
       setSaved(true);
       setTimeout(() => setSaved(false), 4000);
     },
   });
 
   const testTg = useMutation({ mutationFn: api.testTelegram });
-
+  const testImmich = useMutation({ mutationFn: () => api.testImmich() });
   if (isLoading || !settings) return <div>Loading...</div>;
 
   const syncHours = (form.default_sync_interval_seconds ?? settings.default_sync_interval_seconds) / 3600;
@@ -168,6 +175,90 @@ export default function Settings() {
         </section>
 
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+          <h3 className="text-lg font-medium text-violet-300">Immich</h3>
+          <p className="text-sm text-slate-500">
+            Global connection to your Immich server. On each user, link an external library ID so
+            scans run after sync.
+          </p>
+
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.immich_enabled ?? false}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, immich_enabled: e.target.checked }))
+              }
+              className="rounded"
+            />
+            <span>Enable Immich library scans</span>
+          </label>
+
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Immich server URL</label>
+            <input
+              value={form.immich_base_url ?? ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, immich_base_url: e.target.value }))
+              }
+              placeholder="https://immich.example.com"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">API key</label>
+            <input
+              type="password"
+              value={immichApiKeyInput}
+              onChange={(e) => setImmichApiKeyInput(e.target.value)}
+              placeholder={
+                settings.immich_api_key_set
+                  ? `${settings.immich_api_key_masked} (leave blank to keep)`
+                  : "Immich → Account → API Keys (library.read, library.update)"
+              }
+              autoComplete="off"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">
+              Scan debounce (seconds)
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={3600}
+              value={form.immich_scan_debounce_seconds ?? settings.immich_scan_debounce_seconds}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  immich_scan_debounce_seconds: Number(e.target.value),
+                }))
+              }
+              className="w-32 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              Minimum time between scan requests for the same library (across all users).
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => testImmich.mutate()}
+            disabled={testImmich.isPending}
+            className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm"
+          >
+            {testImmich.isPending ? "Connecting…" : "Test Immich connection"}
+          </button>
+          {testImmich.data && (
+            <p className={`text-sm ${testImmich.data.ok ? "text-green-400" : "text-red-400"}`}>
+              {testImmich.data.message}
+            </p>
+          )}
+        </section>
+
+        <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
           <h3 className="text-lg font-medium text-slate-300">Sync</h3>
 
           <div>
@@ -223,6 +314,7 @@ export default function Settings() {
               />
             </div>
           </div>
+
         </section>
 
         <div className="flex flex-wrap items-center gap-4">

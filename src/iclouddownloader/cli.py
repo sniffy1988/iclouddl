@@ -14,7 +14,7 @@ from iclouddownloader.icloud.client import cookie_dir_for_user
 from iclouddownloader.main import run_web
 from iclouddownloader.services.sync_service import SyncService
 from iclouddownloader.services.user_service import UserService
-from iclouddownloader.telegram.notifier import TelegramNotifier
+from iclouddownloader.notifications import AppNotifier
 
 
 @click.group()
@@ -150,7 +150,7 @@ def auth_login(apple_id, password):
 def sync_now(user_id):
     db = get_session_factory()()
     try:
-        run = SyncService(db, notifier=TelegramNotifier()).trigger_sync(user_id)
+        run = SyncService(db, notifier=AppNotifier()).trigger_sync(user_id)
         click.echo(
             f"Sync {run.status.value}: downloaded={run.photos_downloaded} "
             f"failed={run.photos_failed} skipped={run.photos_skipped}"
@@ -205,7 +205,7 @@ def telegram():
 def telegram_test():
     import asyncio
 
-    notifier = TelegramNotifier()
+    notifier = AppNotifier()
     ok = asyncio.run(notifier.test_message())
     click.echo("Sent" if ok else "Failed (check TELEGRAM_* env vars)")
 

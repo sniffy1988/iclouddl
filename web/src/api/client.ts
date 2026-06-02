@@ -53,6 +53,14 @@ export interface User {
   icloud_authorized: boolean;
   icloud_2fa_expires_at: string | null;
   days_until_2fa_expires: number | null;
+  immich_library_id: string | null;
+  immich_scan_after_sync: boolean;
+}
+
+export interface ImmichLibrary {
+  id: string;
+  name: string;
+  importPaths: string[];
 }
 
 export interface PhotoCounts {
@@ -112,6 +120,11 @@ export interface SettingsData {
   max_concurrent_downloads: number;
   scheduler_poll_seconds: number;
   base_download_dir: string;
+  immich_enabled: boolean;
+  immich_base_url: string;
+  immich_api_key_set: boolean;
+  immich_api_key_masked: string;
+  immich_scan_debounce_seconds: number;
 }
 
 export interface DashboardStats {
@@ -143,11 +156,10 @@ export const api = {
     request<{ ok: boolean; queued: number[]; message: string }>("/users/fetch-all-counts", {
       method: "POST",
     }),
-  updateUser: (
-    id: number,
-    data: Partial<User> & { reschedule_sync?: boolean }
-  ) =>
+  updateUser: (id: number, data: Partial<User> & { reschedule_sync?: boolean }) =>
     request<User>(`/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  testUserImmich: (id: number) =>
+    request<{ ok: boolean; message: string }>(`/users/${id}/immich/test`, { method: "POST" }),
   deleteUser: (id: number) => request<void>(`/users/${id}`, { method: "DELETE" }),
   triggerSync: (id: number) =>
     request<TriggerSyncResult>(`/users/${id}/sync`, { method: "POST" }),
@@ -187,7 +199,15 @@ export const api = {
     request<Photo[]>(`/users/${userId}/photos?limit=${limit}`),
   stats: () => request<DashboardStats>("/dashboard/stats"),
   settings: () => request<SettingsData>("/settings"),
-  updateSettings: (data: Partial<SettingsData> & { telegram_bot_token?: string }) =>
-    request<SettingsData>("/settings", { method: "PATCH", body: JSON.stringify(data) }),
+  updateSettings: (
+    data: Partial<SettingsData> & { telegram_bot_token?: string; immich_api_key?: string }
+  ) => request<SettingsData>("/settings", { method: "PATCH", body: JSON.stringify(data) }),
   testTelegram: () => request<{ ok: boolean }>("/telegram/test", { method: "POST" }),
+  testImmich: (libraryId?: string) =>
+    request<{ ok: boolean; message: string }>("/immich/test", {
+      method: "POST",
+      body: JSON.stringify(libraryId ? { library_id: libraryId } : {}),
+    }),
+  immichLibraries: () =>
+    request<{ libraries: ImmichLibrary[] }>("/immich/libraries"),
 };

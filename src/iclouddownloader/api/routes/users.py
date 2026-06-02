@@ -21,7 +21,7 @@ from iclouddownloader.db.models import AuthChallengeStatus
 from iclouddownloader.services.auth_service import AuthService
 from iclouddownloader.services.sync_service import SyncService
 from iclouddownloader.services.user_service import UserService
-from iclouddownloader.telegram.notifier import TelegramNotifier
+from iclouddownloader.notifications import AppNotifier
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -133,6 +133,27 @@ def update_user(
         raise HTTPException(404, str(e)) from e
 
 
+@router.post("/{user_id}/immich/test")
+async def test_user_immich(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_auth),
+):
+    user = UserService(db).get_user(user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    from iclouddownloader.integrations.immich import ImmichClient
+
+    client = ImmichClient()
+    library_id = ImmichClient.library_id_for_user(user)
+    if not library_id:
+        return {"ok": False, "message": "Link an external library ID on this user first"}
+    if not client.configured:
+        return {"ok": False, "message": "Configure Immich in Settings first"}
+    ok, message = await client.test_connection(library_id)
+    return {"ok": ok, "message": message}
+
+
 @router.delete("/{user_id}", status_code=204)
 def delete_user(user_id: int, db: Session = Depends(get_db), _: None = Depends(require_auth)):
     UserService(db).delete_user(user_id)
@@ -217,7 +238,7 @@ def trigger_sync(
         )
 
     sync_svc.mark_sync_queued(user_id)
-    notifier = TelegramNotifier()
+    notifier = AppNotifier()
 
     def _run():
         from iclouddownloader.db.session import get_session_factory

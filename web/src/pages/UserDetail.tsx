@@ -76,6 +76,8 @@ export default function UserDetail() {
   const [customHours, setCustomHours] = useState("6");
   const [scheduledEnabled, setScheduledEnabled] = useState(true);
   const [telegramNotify, setTelegramNotify] = useState(true);
+  const [immichLibraryId, setImmichLibraryId] = useState("");
+  const [immichScanAfterSync, setImmichScanAfterSync] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveOk, setSaveOk] = useState(false);
 
@@ -87,7 +89,20 @@ export default function UserDetail() {
     setCustomHours(String(secondsToHours(user.sync_interval_seconds)));
     setScheduledEnabled(user.enabled);
     setTelegramNotify(user.telegram_notify);
+    setImmichLibraryId(user.immich_library_id ?? "");
+    setImmichScanAfterSync(user.immich_scan_after_sync);
   }, [user]);
+
+  const testImmich = useMutation({
+    mutationFn: () => api.testUserImmich(userId),
+  });
+
+  const immichLibraries = useQuery({
+    queryKey: ["immich-libraries"],
+    queryFn: api.immichLibraries,
+    enabled: immichScanAfterSync,
+    retry: false,
+  });
 
   const saveSettings = useMutation({
     mutationFn: (opts?: { reschedule_sync?: boolean }) => {
@@ -101,6 +116,8 @@ export default function UserDetail() {
         sync_interval_seconds: seconds,
         enabled: scheduledEnabled,
         telegram_notify: telegramNotify,
+        immich_library_id: immichScanAfterSync ? immichLibraryId.trim() || null : null,
+        immich_scan_after_sync: immichScanAfterSync,
         reschedule_sync: opts?.reschedule_sync,
       });
     },
@@ -309,6 +326,78 @@ export default function UserDetail() {
               Telegram notifications for this user
             </label>
           </div>
+        </Section>
+
+        <Section
+          title="Immich external library"
+          description="Link this Apple ID to an Immich external library. Server URL and API key are configured in Settings."
+        >
+          <label className="flex items-center gap-2 text-sm text-slate-300 mb-4 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={immichScanAfterSync}
+              onChange={(e) => setImmichScanAfterSync(e.target.checked)}
+              className="rounded"
+            />
+            Connect this user as an Immich external library
+          </label>
+          {immichScanAfterSync && (
+            <div className="space-y-4">
+              {immichLibraries.data?.libraries && immichLibraries.data.libraries.length > 0 ? (
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">External library</label>
+                  <select
+                    value={immichLibraryId}
+                    onChange={(e) => setImmichLibraryId(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">Select a library…</option>
+                    {immichLibraries.data.libraries.map((lib) => (
+                      <option key={lib.id} value={lib.id}>
+                        {lib.name}
+                        {lib.importPaths?.length
+                          ? ` — ${lib.importPaths.join(", ")}`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">External library ID</label>
+                  <input
+                    value={immichLibraryId}
+                    onChange={(e) => setImmichLibraryId(e.target.value)}
+                    placeholder="UUID from Immich external library"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono"
+                  />
+                  {immichLibraries.isError && (
+                    <p className="text-xs text-amber-400 mt-1">
+                      Could not load libraries — configure Immich in Settings or paste the UUID
+                      manually.
+                    </p>
+                  )}
+                </div>
+              )}
+              <p className="text-xs text-slate-500">
+                Download directory must be inside that library&apos;s import path in Immich. After
+                each successful sync, a library scan is triggered.
+              </p>
+              <button
+                type="button"
+                onClick={() => testImmich.mutate()}
+                disabled={testImmich.isPending || !immichLibraryId.trim()}
+                className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 px-4 py-2 rounded-lg text-sm"
+              >
+                {testImmich.isPending ? "Calling Immich…" : "Test library scan"}
+              </button>
+              {testImmich.data && (
+                <p className={`text-sm ${testImmich.data.ok ? "text-emerald-400" : "text-red-400"}`}>
+                  {testImmich.data.message}
+                </p>
+              )}
+            </div>
+          )}
         </Section>
 
         <Section title="Actions" description="Manual operations — they do not change the schedule.">

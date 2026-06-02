@@ -34,6 +34,10 @@ class RuntimeSettingsService:
             default_sync_interval_seconds=env.default_sync_interval_seconds,
             max_concurrent_downloads=env.max_concurrent_downloads,
             scheduler_poll_seconds=env.scheduler_poll_seconds,
+            immich_enabled=env.immich_enabled,
+            immich_base_url=env.immich_base_url,
+            immich_api_key=env.immich_api_key,
+            immich_scan_debounce_seconds=env.immich_scan_debounce_seconds,
         )
         self.db.add(row)
         self.db.commit()
@@ -58,6 +62,11 @@ class RuntimeSettingsService:
             "max_concurrent_downloads": row.max_concurrent_downloads,
             "scheduler_poll_seconds": row.scheduler_poll_seconds,
             "base_download_dir": str(env.base_download_dir),
+            "immich_enabled": row.immich_enabled,
+            "immich_base_url": row.immich_base_url or "",
+            "immich_api_key_set": bool(row.immich_api_key),
+            "immich_api_key_masked": _mask_token(row.immich_api_key),
+            "immich_scan_debounce_seconds": row.immich_scan_debounce_seconds,
         }
 
     def update(self, data: dict) -> RuntimeSettings:
@@ -81,6 +90,16 @@ class RuntimeSettingsService:
             row.max_concurrent_downloads = int(data["max_concurrent_downloads"])
         if "scheduler_poll_seconds" in data and data["scheduler_poll_seconds"] is not None:
             row.scheduler_poll_seconds = int(data["scheduler_poll_seconds"])
+        if "immich_enabled" in data and data["immich_enabled"] is not None:
+            row.immich_enabled = data["immich_enabled"]
+        if "immich_base_url" in data and data["immich_base_url"] is not None:
+            row.immich_base_url = str(data["immich_base_url"]).strip().rstrip("/")
+        if "immich_api_key" in data and data["immich_api_key"]:
+            token = str(data["immich_api_key"]).strip()
+            if token and not token.startswith("••••"):
+                row.immich_api_key = token
+        if "immich_scan_debounce_seconds" in data and data["immich_scan_debounce_seconds"] is not None:
+            row.immich_scan_debounce_seconds = max(int(data["immich_scan_debounce_seconds"]), 0)
 
         self.db.commit()
         self.db.refresh(row)
@@ -103,6 +122,10 @@ def get_effective_settings_from_row(row: RuntimeSettings | None) -> Settings:
             "default_sync_interval_seconds": row.default_sync_interval_seconds,
             "max_concurrent_downloads": row.max_concurrent_downloads,
             "scheduler_poll_seconds": row.scheduler_poll_seconds,
+            "immich_enabled": row.immich_enabled,
+            "immich_base_url": row.immich_base_url,
+            "immich_api_key": row.immich_api_key,
+            "immich_scan_debounce_seconds": row.immich_scan_debounce_seconds,
         }
     )
 

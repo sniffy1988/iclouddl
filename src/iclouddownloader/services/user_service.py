@@ -60,13 +60,16 @@ class UserService:
         interval_changed = False
         was_enabled = user.enabled
 
-        for key, value in kwargs.items():
+        for key, value in list(kwargs.items()):
             if not hasattr(user, key):
                 continue
             if value is None:
                 continue
             if key == "sync_interval_seconds":
                 interval_changed = True
+            if key == "immich_library_id":
+                user.immich_library_id = str(value).strip() or None
+                continue
             setattr(user, key, value)
 
         if user.enabled and not was_enabled and user.next_sync_at is None:

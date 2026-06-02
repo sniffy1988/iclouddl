@@ -54,6 +54,8 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
 
 Keep `.env` and `./data/` on the server — they are not touched by CI.
 
+Configure Immich in **Settings** (URL, API key, test connection). Per Apple ID, link an external library on **Users → user → Immich external library**.
+
 ## GitHub Actions
 
 | Workflow | Trigger | What it does |

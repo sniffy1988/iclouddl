@@ -14,7 +14,7 @@ from iclouddownloader.services.auth_service import AuthService
 from iclouddownloader.services.sync_service import SyncService
 from iclouddownloader.services.user_service import UserService
 from iclouddownloader.telegram.bot import run_telegram_bot
-from iclouddownloader.telegram.notifier import TelegramNotifier
+from iclouddownloader.notifications import AppNotifier
 
 logger = logging.getLogger(__name__)
 _shutdown = False
@@ -26,7 +26,7 @@ def _handle_signal(signum, frame):
     _shutdown = True
 
 
-def _sync_user(user_id: int, notifier: TelegramNotifier) -> None:
+def _sync_user(user_id: int, notifier: AppNotifier) -> None:
     db = get_session_factory()()
     try:
         sync_svc = SyncService(db, notifier=notifier)
@@ -37,7 +37,7 @@ def _sync_user(user_id: int, notifier: TelegramNotifier) -> None:
         db.close()
 
 
-def _poll_due_users(notifier: TelegramNotifier) -> None:
+def _poll_due_users(notifier: AppNotifier) -> None:
     db = get_session_factory()()
     try:
         user_svc = UserService(db)
@@ -64,7 +64,7 @@ def run_daemon() -> None:
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
     settings = get_settings()
-    notifier = TelegramNotifier()
+    notifier = AppNotifier()
 
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)

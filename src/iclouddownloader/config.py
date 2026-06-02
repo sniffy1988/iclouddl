@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     # Apple trusted-browser session lifetime after 2FA (days)
     icloud_trusted_session_days: int = 30
 
+    immich_enabled: bool = False
+    immich_base_url: str = ""
+    immich_api_key: str = ""
+    immich_scan_debounce_seconds: int = 120
+
     @property
     def telegram_allowed_ids(self) -> list[int]:
         if not self.telegram_allowed_user_ids.strip():

@@ -11,6 +11,7 @@ from iclouddownloader.icloud.auth import AuthRequired, get_pyicloud_service
 from iclouddownloader.icloud.client import cookie_dir_for_user
 from iclouddownloader.icloud.assets import index_library_to_db
 from iclouddownloader.icloud.sync import PhotoSyncEngine
+from iclouddownloader.integrations.immich import immich_fields_for_api
 from iclouddownloader.services.auth_service import AuthService
 from iclouddownloader.services.user_service import UserService
 
@@ -122,6 +123,7 @@ class SyncService:
             "icloud_authorized": AuthService.is_authorized(user),
             "icloud_2fa_expires_at": AuthService.icloud_2fa_expires_at(user),
             "days_until_2fa_expires": AuthService.days_until_2fa_expires(user),
+            **immich_fields_for_api(user),
             "created_at": user.created_at,
             "updated_at": user.updated_at,
         }

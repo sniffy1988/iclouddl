@@ -83,6 +83,13 @@ class PhotoSyncEngine:
                 payload=payload,
             )
         )
+        if self.notifier and event_type == "sync.completed":
+            immich_notify = getattr(self.notifier, "immich_after_sync", None)
+            if immich_notify:
+                try:
+                    immich_notify(user, payload)
+                except Exception:
+                    logger.exception("Immich notify failed")
         if self.notifier and user.telegram_notify:
             self._notify_telegram(event_type, user, payload)
 

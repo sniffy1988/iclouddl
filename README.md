@@ -163,6 +163,9 @@ iclouddownloader telegram test
 | `TELEGRAM_ENABLED` | Enable Telegram bot |
 | `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather |
 | `TELEGRAM_ADMIN_CHAT_ID` | Chat ID for ops notifications |
+| `IMMICH_SCAN_DEBOUNCE_SECONDS` | Global min seconds between Immich scans (default 120) |
+
+Immich server URL and API key are configured in **Settings** (with test connection). On each **User** page, link that Apple ID to an Immich external library ID so scans run after sync.
 
 ## Architecture
 
