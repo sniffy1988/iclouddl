@@ -12,7 +12,7 @@ __pycache__/
 *.md
 !README.md
 web/node_modules/
-web/src/
+web/dist/
 tests/
 data/
 *.db
