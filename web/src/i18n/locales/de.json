@@ -233,7 +233,7 @@
     "connectedAs": "Verbunden als {{email}}",
     "googleConnectHelp": "Google-Anmeldung in neuem Tab. Nach Bestätigung zurück zu dieser Seite. Bei Fehler Redirect-URI in Google Cloud und Einstellungen prüfen.",
     "scheduleTitle": "Sync-Zeitplan",
-    "scheduleDesc": "Der Hintergrund-Worker lädt in diesem Intervall vollständig, wenn der Zeitplan aktiv ist.",
+    "scheduleDesc": "Wenn aktiv, lädt der Worker in diesem Intervall erst nach mindestens einem manuellen Sync oder „Alle synchronisieren“. iCloud- oder Google-Verbindung startet keinen Download.",
     "interval": "Intervall",
     "hoursBetween": "Stunden zwischen Syncs",
     "minInterval": "Minimum 5 Minuten (0,083 h)",

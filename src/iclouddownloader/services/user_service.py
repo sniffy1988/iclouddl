@@ -47,7 +47,7 @@ class UserService:
             download_dir=download_dir or "",
             sync_interval_seconds=interval,
             library_key=library_key,
-            next_sync_at=datetime.now(timezone.utc),
+            next_sync_at=None,
             icloud_needs_auth=bool(apple_id),
         )
         self.db.add(user)
@@ -93,9 +93,6 @@ class UserService:
                 continue
             setattr(user, key, value)
 
-        if user.enabled and not was_enabled and user.next_sync_at is None:
-            user.next_sync_at = datetime.now(timezone.utc)
-
         if user.enabled and (reschedule or interval_changed):
             user.next_sync_at = datetime.now(timezone.utc) + timedelta(
                 seconds=user.sync_interval_seconds
@@ -119,10 +116,12 @@ class UserService:
         self.db.commit()
 
     def users_due_for_sync(self) -> list[User]:
+        """Enabled users with a scheduled time that has passed (set after a manual sync)."""
         now = datetime.now(timezone.utc)
         stmt = (
             select(User)
             .where(User.enabled.is_(True))
-            .where((User.next_sync_at.is_(None)) | (User.next_sync_at <= now))
+            .where(User.next_sync_at.isnot(None))
+            .where(User.next_sync_at <= now)
         )
         return list(self.db.scalars(stmt).all())

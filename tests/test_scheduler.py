@@ -37,6 +37,21 @@ def test_users_due_for_sync(db_session):
     assert "off@icloud.com" not in ids
 
 
+def test_users_with_no_schedule_never_due(db_session):
+    manual = User(
+        apple_id="manual@icloud.com",
+        download_dir="/tmp/m",
+        sync_interval_seconds=3600,
+        enabled=True,
+        next_sync_at=None,
+    )
+    db_session.add(manual)
+    db_session.commit()
+
+    result = UserService(db_session).users_due_for_sync()
+    assert "manual@icloud.com" not in {u.apple_id for u in result}
+
+
 def test_schedule_next_sync(db_session):
     user = User(
         apple_id="u@icloud.com",
