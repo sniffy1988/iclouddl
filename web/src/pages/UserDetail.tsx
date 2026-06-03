@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import { useToast } from "../components/ToastProvider";
 import AuthorizeButton from "../components/AuthorizeButton";
 import { format2faDaysLeft } from "../utils/format2fa";
+import { formatDateTime } from "../utils/formatDateTime";
 import StatusPill from "../components/StatusPill";
 import ConnectGoogleButton from "../components/ConnectGoogleButton";
 import ProviderConnectionBanner from "../components/ProviderConnectionBanner";
@@ -344,7 +345,7 @@ export default function UserDetail() {
           {user.icloud_authenticated_at && (
             <p className="text-xs text-slate-500 mb-3">
               {t("userDetail.lastSignIn", {
-                time: new Date(user.icloud_authenticated_at).toLocaleString(),
+                time: formatDateTime(user.icloud_authenticated_at),
               })}
             </p>
           )}
@@ -471,7 +472,7 @@ export default function UserDetail() {
               <dt className="text-slate-500">{t("userDetail.nextScheduled")}</dt>
               <dd className="text-slate-200 mt-0.5">
                 {scheduledEnabled && user.next_sync_at
-                  ? new Date(user.next_sync_at).toLocaleString()
+                  ? formatDateTime(user.next_sync_at)
                   : scheduledEnabled
                     ? t("common.soon")
                     : t("common.disabledParen")}
@@ -481,7 +482,7 @@ export default function UserDetail() {
               <dt className="text-slate-500">{t("userDetail.lastSync")}</dt>
               <dd className="text-slate-200 mt-0.5">
                 {user.last_sync_at
-                  ? new Date(user.last_sync_at).toLocaleString()
+                  ? formatDateTime(user.last_sync_at)
                   : t("common.dash")}
               </dd>
             </div>
@@ -636,7 +637,7 @@ export default function UserDetail() {
               </td>
               <td className="py-2">{r.photos_downloaded}</td>
               <td className="py-2">{r.photos_failed}</td>
-              <td className="py-2 text-slate-500">{new Date(r.started_at).toLocaleString()}</td>
+              <td className="py-2 text-slate-500">{formatDateTime(r.started_at)}</td>
             </tr>
           ))}
         </tbody>

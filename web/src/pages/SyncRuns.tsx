@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { formatDateTime } from "../utils/formatDateTime";
 import StopSyncButton from "../components/StopSyncButton";
 import SyncNowButton from "../components/SyncNowButton";
 
@@ -59,7 +60,7 @@ export default function SyncRuns() {
               <td className="py-3">{r.photos_downloaded}</td>
               <td className="py-3">{r.photos_failed}</td>
               <td className="py-3 text-slate-500">
-                {new Date(r.started_at).toLocaleString()}
+                {formatDateTime(r.started_at)}
               </td>
               <td className="py-3 text-slate-500 text-xs max-w-[200px] truncate">
                 {r.error_summary || t("common.dash")}

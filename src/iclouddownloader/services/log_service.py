@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from iclouddownloader.api.serialization import serialize_api_datetime
 from iclouddownloader.db.models import AppLog
 
 
@@ -49,7 +50,7 @@ class LogService:
     def serialize(row: AppLog) -> dict:
         return {
             "id": row.id,
-            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "created_at": serialize_api_datetime(row.created_at) if row.created_at else None,
             "level": row.level,
             "logger_name": row.logger_name,
             "message": row.message,

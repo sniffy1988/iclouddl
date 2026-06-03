@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from iclouddownloader.api.serialization import ApiDateTime
+
 
 class LoginRequest(BaseModel):
     password: str
@@ -48,17 +50,17 @@ class UserResponse(BaseModel):
     sync_interval_seconds: int
     enabled: bool
     library_key: str
-    next_sync_at: datetime | None
-    last_sync_at: datetime | None
+    next_sync_at: ApiDateTime | None
+    last_sync_at: ApiDateTime | None
     last_sync_status: str | None
     auth_status: str = "not_authorized"
     icloud_auth_status: str = "not_linked"
     google_auth_status: str = "not_linked"
     activity_status: str = "idle"
     icloud_photos_count: int | None = None
-    icloud_photos_count_at: datetime | None = None
+    icloud_photos_count_at: ApiDateTime | None = None
     google_photos_count: int | None = None
-    google_photos_count_at: datetime | None = None
+    google_photos_count_at: ApiDateTime | None = None
     google_account_email: str | None = None
     downloaded_count: int = 0
     icloud_downloaded_count: int = 0
@@ -66,23 +68,23 @@ class UserResponse(BaseModel):
     icloud_remaining: int | None = None
     google_remaining: int | None = None
     remaining_to_download: int | None = None
-    icloud_authenticated_at: datetime | None = None
-    icloud_2fa_at: datetime | None = None
-    icloud_session_ok_at: datetime | None = None
+    icloud_authenticated_at: ApiDateTime | None = None
+    icloud_2fa_at: ApiDateTime | None = None
+    icloud_session_ok_at: ApiDateTime | None = None
     icloud_needs_auth: bool = True
     icloud_pending_challenge: bool = False
     icloud_authorized: bool = False
     google_authorized: bool = False
     google_needs_auth: bool = True
-    google_authenticated_at: datetime | None = None
+    google_authenticated_at: ApiDateTime | None = None
     linked_providers: list[str] = []
     active_syncs_by_scope: dict[str, bool] = {}
-    icloud_2fa_expires_at: datetime | None = None
+    icloud_2fa_expires_at: ApiDateTime | None = None
     days_until_2fa_expires: int | None = None
     immich_library_id: str | None = None
     immich_scan_after_sync: bool = False
-    created_at: datetime
-    updated_at: datetime
+    created_at: ApiDateTime
+    updated_at: ApiDateTime
 
     model_config = {"from_attributes": True}
 
@@ -91,8 +93,8 @@ class SyncRunResponse(BaseModel):
     id: int
     user_id: int
     scope: str = "all"
-    started_at: datetime
-    finished_at: datetime | None
+    started_at: ApiDateTime
+    finished_at: ApiDateTime | None
     status: str
     photos_discovered: int
     photos_downloaded: int
@@ -112,14 +114,14 @@ class PhotoResponse(BaseModel):
     local_path: str | None
     file_size: int | None
     checksum_sha256: str | None
-    asset_date: datetime | None
+    asset_date: ApiDateTime | None
     media_type: str | None
     companion_local_path: str | None = None
     companion_media_type: str | None = None
     companion_file_size: int | None = None
     companion_checksum_sha256: str | None = None
     status: str
-    downloaded_at: datetime | None
+    downloaded_at: ApiDateTime | None
     error_message: str | None
 
     model_config = {"from_attributes": True}
@@ -148,7 +150,7 @@ class AuthChallengeResponse(BaseModel):
     user_id: int
     challenge_type: str
     status: str
-    expires_at: datetime
+    expires_at: ApiDateTime
 
     model_config = {"from_attributes": True}
 
@@ -157,9 +159,9 @@ class PhotoCountResponse(BaseModel):
     user_id: int
     source: str | None = None
     icloud_photos_count: int | None
-    icloud_photos_count_at: datetime | None
+    icloud_photos_count_at: ApiDateTime | None
     google_photos_count: int | None = None
-    google_photos_count_at: datetime | None = None
+    google_photos_count_at: ApiDateTime | None = None
     downloaded_count: int
     tracked_count: int
     icloud_downloaded_count: int = 0

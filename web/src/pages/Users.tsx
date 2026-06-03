@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api, User } from "../api/client";
 import { format2faDaysLeft } from "../utils/format2fa";
+import { formatDateTime } from "../utils/formatDateTime";
 import StatusPill from "../components/StatusPill";
 import { formatSyncInterval } from "../utils/syncSchedule";
 import { useToast } from "../components/ToastProvider";
@@ -190,7 +191,7 @@ export default function Users() {
                       {u.next_sync_at ? (
                         <span title={t("common.nextScheduledSync")}>
                           {t("common.next", {
-                            time: new Date(u.next_sync_at).toLocaleString(),
+                            time: formatDateTime(u.next_sync_at),
                           })}
                         </span>
                       ) : (
@@ -202,7 +203,7 @@ export default function Users() {
                   )}
                 </td>
                 <td className="py-3 pr-4 text-slate-500 whitespace-nowrap">
-                  {u.last_sync_at ? new Date(u.last_sync_at).toLocaleString() : t("common.dash")}
+                  {u.last_sync_at ? formatDateTime(u.last_sync_at) : t("common.dash")}
                 </td>
                 <td className="py-3">
                   <Link

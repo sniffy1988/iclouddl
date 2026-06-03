@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { formatDateTime } from "../utils/formatDateTime";
 import { useToast } from "../components/ToastProvider";
 
 const LEVELS = ["", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] as const;
@@ -135,7 +136,7 @@ export default function Logs() {
             className="bg-slate-900/80 border border-slate-800 rounded-lg px-3 py-2"
           >
             <div className="flex flex-wrap items-center gap-2 mb-1 text-slate-500">
-              <span>{entry.created_at ? new Date(entry.created_at).toLocaleString() : "—"}</span>
+              <span>{entry.created_at ? formatDateTime(entry.created_at) : "—"}</span>
               <span className={`px-1.5 py-0.5 rounded ${levelClass(entry.level)}`}>
                 {entry.level}
               </span>
