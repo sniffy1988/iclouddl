@@ -35,7 +35,12 @@ def asset_date(photo: Any) -> datetime | None:
 
 
 def asset_media_type(photo: Any) -> str | None:
-    return getattr(photo, "media_type", None)
+    from iclouddownloader.icloud.media import classify_media_type
+
+    try:
+        return classify_media_type(photo)
+    except Exception:
+        return getattr(photo, "media_type", None)
 
 
 def upsert_photo_record(

@@ -40,7 +40,7 @@ export default function ConnectGoogleButton({
   });
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-3">
       {!isConnected && (
         <button
           type="button"

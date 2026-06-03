@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api, User } from "../api/client";
-import AuthorizeButton from "../components/AuthorizeButton";
 import { format2faDaysLeft } from "../utils/format2fa";
 import StatusPill from "../components/StatusPill";
 import { formatSyncInterval } from "../utils/syncSchedule";
@@ -206,24 +205,12 @@ export default function Users() {
                   {u.last_sync_at ? new Date(u.last_sync_at).toLocaleString() : t("common.dash")}
                 </td>
                 <td className="py-3">
-                  <div className="flex flex-wrap gap-2">
-                    {u.apple_id && (
-                      <AuthorizeButton
-                        userId={u.id}
-                        appleId={u.apple_id}
-                        icloudAuthorized={u.icloud_authorized}
-                        icloudNeedsAuth={u.icloud_needs_auth}
-                        icloudPendingChallenge={u.icloud_pending_challenge}
-                        size="sm"
-                      />
-                    )}
-                    <Link
-                      to={`/users/${u.id}`}
-                      className="text-sky-400 hover:underline text-xs px-2 py-1"
-                    >
-                      {t("common.manage")}
-                    </Link>
-                  </div>
+                  <Link
+                    to={`/users/${u.id}`}
+                    className="text-sky-400 hover:underline text-xs px-2 py-1"
+                  >
+                    {t("common.manage")}
+                  </Link>
                 </td>
               </tr>
             ))}

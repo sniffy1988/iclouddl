@@ -27,9 +27,13 @@ class ImmichClient:
         self.settings = get_effective_settings()
 
     @property
+    def enabled(self) -> bool:
+        return bool(self.settings.immich_enabled)
+
+    @property
     def configured(self) -> bool:
         return (
-            self.settings.immich_enabled
+            self.enabled
             and bool(self.settings.immich_base_url.strip())
             and bool(self.settings.immich_api_key.strip())
         )
@@ -47,6 +51,8 @@ class ImmichClient:
         return self.library_id_for_user(user) is not None
 
     def list_libraries(self) -> tuple[bool, list[dict] | str]:
+        if not self.enabled:
+            return False, "Immich integration is disabled in Settings"
         if not self.configured:
             return False, "Configure Immich URL and API key in Settings"
         base = self.settings.immich_base_url.rstrip("/")

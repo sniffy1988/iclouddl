@@ -40,7 +40,7 @@ export default function AuthorizeButton({
   });
 
   const awaiting2fa = icloudPendingChallenge || !!challenge;
-  const isConnected = icloudAuthorized && !icloudNeedsAuth && !awaiting2fa;
+  const needsAuthAction = awaiting2fa || icloudNeedsAuth || !icloudAuthorized;
 
   const openModal = () => {
     setOpen(true);
@@ -104,6 +104,11 @@ export default function AuthorizeButton({
   });
 
   const pad = size === "sm" ? "px-2 py-1 text-xs" : "px-4 py-2 text-sm";
+
+  if (!needsAuthAction) {
+    return null;
+  }
+
   return (
     <>
       <button
@@ -111,18 +116,12 @@ export default function AuthorizeButton({
         onClick={openModal}
         title={t("authorize.authorizeTitle")}
         className={`rounded-lg font-medium disabled:opacity-50 ${pad} ${
-          isConnected
-            ? "bg-slate-700 hover:bg-slate-600"
-            : icloudNeedsAuth
-              ? "bg-amber-600 hover:bg-amber-500"
-              : "bg-emerald-700 hover:bg-emerald-600"
+          awaiting2fa || icloudNeedsAuth
+            ? "bg-amber-600 hover:bg-amber-500"
+            : "bg-emerald-700 hover:bg-emerald-600"
         }`}
       >
-        {awaiting2fa
-          ? t("buttons.complete2fa")
-          : isConnected
-            ? t("buttons.reauthorize")
-            : t("buttons.authorize")}
+        {awaiting2fa ? t("buttons.complete2fa") : t("buttons.authorize")}
       </button>
 
       {open && (

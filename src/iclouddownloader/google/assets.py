@@ -28,10 +28,24 @@ def _filename(item: dict[str, Any]) -> str:
     return str(item.get("filename") or f"{item.get('id', 'unknown')}.jpg")
 
 
+def is_motion_photo(item: dict[str, Any]) -> bool:
+    meta = item.get("mediaMetadata") or {}
+    photo_meta = meta.get("photo") or {}
+    return bool(photo_meta.get("motionPhoto"))
+
+
+def media_item_ready(item: dict[str, Any]) -> bool:
+    meta = item.get("mediaMetadata") or {}
+    status = meta.get("status")
+    return status is None or status == "READY"
+
+
 def _media_type(item: dict[str, Any]) -> str | None:
     meta = item.get("mediaMetadata") or {}
     if meta.get("video"):
         return "video"
+    if is_motion_photo(item):
+        return "motion_photo"
     if meta.get("photo"):
         return "photo"
     return None

@@ -152,6 +152,8 @@ async def test_user_immich(
     from iclouddownloader.integrations.immich import ImmichClient
 
     client = ImmichClient()
+    if not client.enabled:
+        raise HTTPException(400, "Immich integration is disabled in Settings")
     library_id = ImmichClient.library_id_for_user(user)
     if not library_id:
         return {"ok": False, "message": "Link an external library ID on this user first"}

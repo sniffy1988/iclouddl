@@ -132,6 +132,10 @@ class Photo(Base):
     checksum_sha256: Mapped[str | None] = mapped_column(String(64))
     asset_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     media_type: Mapped[str | None] = mapped_column(String(64))
+    companion_local_path: Mapped[str | None] = mapped_column(String(2048))
+    companion_media_type: Mapped[str | None] = mapped_column(String(64))
+    companion_file_size: Mapped[int | None] = mapped_column(BigInteger)
+    companion_checksum_sha256: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[PhotoStatus] = mapped_column(
         Enum(PhotoStatus, native_enum=False), default=PhotoStatus.pending
     )

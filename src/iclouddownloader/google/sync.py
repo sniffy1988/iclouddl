@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from iclouddownloader.db.models import Photo, PhotoSource, PhotoStatus, SyncRun, SyncRunScope, SyncRunStatus, User
 from iclouddownloader.events import SyncEvent, get_event_bus
+from iclouddownloader.google.assets import is_motion_photo, media_item_ready
 from iclouddownloader.google.client import GooglePhotosClient
 from iclouddownloader.path_template import apply_path_template
 from iclouddownloader.paths import provider_download_dir
@@ -30,6 +31,11 @@ def _local_path(
 ) -> Path:
     template = path_template or get_effective_settings().download_path_template
     return base / apply_path_template(template, dt, filename, source="google_photos")
+
+
+def _motion_companion_filename(primary_filename: str) -> str:
+    stem = Path(primary_filename).stem
+    return f"{stem}.mp4"
 
 
 def _sha256(path: Path) -> str:
@@ -93,16 +99,27 @@ class GooglePhotoSyncEngine:
         counters: dict[str, int],
         item_cache: dict[str, dict],
     ) -> str:
-        if record.status == PhotoStatus.downloaded:
-            if record.local_path and Path(record.local_path).exists():
-                counters["skipped"] += 1
-                return "skipped"
-
         item = item_cache.get(record.provider_asset_id)
         if not item:
             counters["failed"] += 1
             record.status = PhotoStatus.failed
             record.error_message = "Media item not found in Google library"
+            return "failed"
+
+        motion = is_motion_photo(item)
+        if record.status == PhotoStatus.downloaded:
+            if record.local_path and Path(record.local_path).exists():
+                if not motion or (
+                    record.companion_local_path
+                    and Path(record.companion_local_path).exists()
+                ):
+                    counters["skipped"] += 1
+                    return "skipped"
+
+        if not media_item_ready(item):
+            counters["failed"] += 1
+            record.status = PhotoStatus.failed
+            record.error_message = "Media item not ready for download"
             return "failed"
 
         base_url = item.get("baseUrl")
@@ -123,6 +140,21 @@ class GooglePhotoSyncEngine:
             record.local_path = str(dest)
             record.file_size = dest.stat().st_size
             record.checksum_sha256 = _sha256(dest)
+            if motion:
+                companion_name = _motion_companion_filename(record.filename)
+                companion_dest = _local_path(base_dir, dt, companion_name)
+                video_data = client.download_bytes(base_url, variant="dv")
+                companion_dest.parent.mkdir(parents=True, exist_ok=True)
+                companion_dest.write_bytes(video_data)
+                record.companion_local_path = str(companion_dest)
+                record.companion_media_type = "motion_video"
+                record.companion_file_size = companion_dest.stat().st_size
+                record.companion_checksum_sha256 = _sha256(companion_dest)
+            else:
+                record.companion_local_path = None
+                record.companion_media_type = None
+                record.companion_file_size = None
+                record.companion_checksum_sha256 = None
             record.status = PhotoStatus.downloaded
             record.downloaded_at = datetime.now(timezone.utc)
             record.error_message = None

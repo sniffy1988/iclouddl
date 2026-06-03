@@ -11,12 +11,15 @@ export default function FieldHelp({ children, className = "" }: Props) {
 type HelpBoxProps = {
   title?: string;
   children: React.ReactNode;
+  className?: string;
 };
 
 /** Bordered panel for multi-step or longer instructions. */
-export function HelpBox({ title, children }: HelpBoxProps) {
+export function HelpBox({ title, children, className = "" }: HelpBoxProps) {
   return (
-    <div className="rounded-lg border border-slate-700/80 bg-slate-800/40 px-3 py-3 text-xs text-slate-400 leading-relaxed space-y-2">
+    <div
+      className={`rounded-lg border border-slate-700/80 bg-slate-800/40 px-3 py-3 text-xs text-slate-400 leading-relaxed space-y-2 ${className}`}
+    >
       {title && <p className="font-medium text-slate-300">{title}</p>}
       {children}
     </div>

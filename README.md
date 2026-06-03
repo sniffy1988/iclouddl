@@ -13,6 +13,21 @@ Multi-user photo backup service for **iCloud Photos** and **Google Photos** with
 - **Telegram** — optional bot for iCloud 2FA: message your bot with `/code 123456` when prompted
 - **Web UI** — manage users, monitor syncs, submit 2FA codes, live SSE event feed
 
+## What gets downloaded
+
+Backup targets your full **iCloud Photos** library (`All Photos`) and **Google Photos** library (`mediaItems` API). Every asset is attempted; common types include:
+
+| Type | iCloud | Google Photos |
+|------|--------|---------------|
+| Photos (JPEG, HEIC, PNG, …) | Original via pyicloud | `baseUrl=d` |
+| Videos | Original | `baseUrl=dv` |
+| Live Photos | Still + companion `.mov` | — |
+| Motion photos | — | Still + companion video (`d` + `dv`) |
+
+Not included: Recently Deleted, Hidden albums, iCloud Drive, or burst frames beyond what Apple/Google expose as a single library item.
+
+**Immich:** per-user external library settings appear only when **Settings → Enable Immich library scans** is on.
+
 ## Apple account requirements
 
 1. Enable **Settings → Apple ID → iCloud → Access iCloud Data on the Web** on your iPhone/iPad

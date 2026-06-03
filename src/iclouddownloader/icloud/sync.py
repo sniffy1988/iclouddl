@@ -21,7 +21,17 @@ from iclouddownloader.icloud.client import cookie_dir_for_user
 from iclouddownloader.icloud.assets import asset_date as _asset_date
 from iclouddownloader.icloud.assets import asset_filename as _asset_filename
 from iclouddownloader.icloud.assets import asset_id as _asset_id
+from iclouddownloader.icloud.assets import asset_media_type
 from iclouddownloader.icloud.library import list_library_photos
+from iclouddownloader.icloud.media import (
+    LIVE_VIDEO_PREFIX,
+    classify_media_type,
+    download_by_prefix,
+    download_version,
+    has_live_video_component,
+    live_video_filename,
+    master_fields,
+)
 from iclouddownloader.paths import provider_download_dir
 from iclouddownloader.providers.base import ProviderSyncResult, account_label, apply_provider_result_to_run
 from iclouddownloader.providers.cancel import drain_futures_with_cancel, is_sync_cancel_requested
@@ -43,9 +53,10 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def _download_asset(photo: Any, dest: Path) -> None:
+def _write_response(response: Any, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    response = photo.download()
+    if response is None:
+        raise ValueError("Download returned no data")
     if hasattr(response, "raw"):
         with dest.open("wb") as f:
             shutil.copyfileobj(response.raw, f)
@@ -55,6 +66,21 @@ def _download_asset(photo: Any, dest: Path) -> None:
     else:
         with dest.open("wb") as f:
             f.write(response)
+
+
+def _download_asset(photo: Any, dest: Path) -> None:
+    response = download_version(photo, "original")
+    _write_response(response, dest)
+
+
+def _download_live_companion(api_photo: Any, base_dir: Path, primary_filename: str) -> Path | None:
+    if not has_live_video_component(api_photo):
+        return None
+    companion_name = live_video_filename(primary_filename, master_fields(api_photo))
+    dest = _local_path(base_dir, api_photo, companion_name)
+    if not download_by_prefix(api_photo, LIVE_VIDEO_PREFIX, dest):
+        return None
+    return dest
 
 
 class PhotoSyncEngine:
@@ -122,6 +148,27 @@ class PhotoSyncEngine:
             )
         )
 
+    def _pending_photos(self, user_id: int) -> list[Photo]:
+        return list(
+            self.db.scalars(
+                select(Photo).where(
+                    Photo.user_id == user_id,
+                    Photo.source == PhotoSource.icloud,
+                    Photo.status.in_([PhotoStatus.pending, PhotoStatus.failed]),
+                )
+            ).all()
+        )
+
+    def _is_fully_downloaded(self, record: Photo, api_photo: Any) -> bool:
+        if record.status != PhotoStatus.downloaded:
+            return False
+        if not record.local_path or not Path(record.local_path).exists():
+            return False
+        if has_live_video_component(api_photo):
+            if not record.companion_local_path or not Path(record.companion_local_path).exists():
+                return False
+        return True
+
     def _process_photo(
         self,
         user: User,
@@ -133,10 +180,11 @@ class PhotoSyncEngine:
         filename = _asset_filename(api_photo)
         existing = self._photo_exists(user.id, asset_id)
 
-        if existing and existing.status == PhotoStatus.downloaded:
-            if existing.local_path and Path(existing.local_path).exists():
-                counters["skipped"] += 1
-                return "skipped"
+        media = asset_media_type(api_photo) or classify_media_type(api_photo)
+
+        if existing and self._is_fully_downloaded(existing, api_photo):
+            counters["skipped"] += 1
+            return "skipped"
 
         dest = _local_path(base_dir, api_photo, filename)
         record = existing or Photo(
@@ -146,8 +194,11 @@ class PhotoSyncEngine:
             filename=filename,
             status=PhotoStatus.pending,
             asset_date=_asset_date(api_photo),
-            media_type=getattr(api_photo, "media_type", None),
+            media_type=media,
         )
+        record.filename = filename
+        record.asset_date = _asset_date(api_photo)
+        record.media_type = media
         if not existing:
             self.db.add(record)
 
@@ -157,6 +208,19 @@ class PhotoSyncEngine:
             record.local_path = str(dest)
             record.file_size = dest.stat().st_size
             record.checksum_sha256 = checksum
+            companion_dest = _download_live_companion(api_photo, base_dir, filename)
+            if companion_dest:
+                record.companion_local_path = str(companion_dest)
+                record.companion_media_type = "live_video"
+                record.companion_file_size = companion_dest.stat().st_size
+                record.companion_checksum_sha256 = _sha256(companion_dest)
+            elif media == "live_photo":
+                raise ValueError("Live Photo video component download failed")
+            else:
+                record.companion_local_path = None
+                record.companion_media_type = None
+                record.companion_file_size = None
+                record.companion_checksum_sha256 = None
             record.status = PhotoStatus.downloaded
             record.downloaded_at = datetime.now(timezone.utc)
             record.error_message = None
@@ -193,7 +257,13 @@ class PhotoSyncEngine:
             base_dir = provider_download_dir(user, PhotoSource.icloud)
 
             photos = self._iter_photos(api)
+            api_ids = {_asset_id(p) for p in photos}
             counters["discovered"] = len(photos)
+
+            for stale in self._pending_photos(user.id):
+                if stale.provider_asset_id not in api_ids:
+                    stale.status = PhotoStatus.skipped
+                    stale.error_message = "Asset no longer in iCloud library"
 
             workers = self.max_workers or get_effective_settings().max_concurrent_downloads
             with ThreadPoolExecutor(max_workers=workers) as pool:

@@ -48,7 +48,10 @@ async def test_telegram(db: Session = Depends(get_db), _: None = Depends(require
 
 @router.get("/immich/libraries")
 def list_immich_libraries(_: None = Depends(require_auth)):
-    ok, result = ImmichClient().list_libraries()
+    client = ImmichClient()
+    if not client.enabled:
+        raise HTTPException(400, "Immich integration is disabled in Settings")
+    ok, result = client.list_libraries()
     if not ok:
         raise HTTPException(400, str(result))
     return {"libraries": result}

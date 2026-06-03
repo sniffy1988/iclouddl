@@ -93,6 +93,11 @@ export default function UserDetail() {
     refetchInterval:
       user?.activity_status === "syncing" || user?.activity_status === "queued" ? 3000 : false,
   });
+  const { data: appSettings } = useQuery({
+    queryKey: ["settings"],
+    queryFn: api.settings,
+  });
+  const immichIntegrationEnabled = appSettings?.immich_enabled ?? false;
 
   const [displayName, setDisplayName] = useState("");
   const [appleIdEdit, setAppleIdEdit] = useState("");
@@ -138,7 +143,7 @@ export default function UserDetail() {
   const immichLibraries = useQuery({
     queryKey: ["immich-libraries"],
     queryFn: api.immichLibraries,
-    enabled: immichScanAfterSync,
+    enabled: immichIntegrationEnabled && immichScanAfterSync,
     retry: false,
   });
 
@@ -159,7 +164,7 @@ export default function UserDetail() {
         intervalPreset === "custom"
           ? hoursToSeconds(parseFloat(customHours) || 6)
           : Number(intervalPreset);
-      return api.updateUser(userId, {
+      const payload: Parameters<typeof api.updateUser>[1] = {
         display_name:
           displayName.trim() ||
           user!.account_label ||
@@ -169,10 +174,15 @@ export default function UserDetail() {
         download_dir: downloadDir.trim(),
         sync_interval_seconds: seconds,
         enabled: scheduledEnabled,
-        immich_library_id: immichScanAfterSync ? immichLibraryId.trim() || null : null,
-        immich_scan_after_sync: immichScanAfterSync,
         reschedule_sync: opts?.reschedule_sync,
-      });
+      };
+      if (immichIntegrationEnabled) {
+        payload.immich_library_id = immichScanAfterSync
+          ? immichLibraryId.trim() || null
+          : null;
+        payload.immich_scan_after_sync = immichScanAfterSync;
+      }
+      return api.updateUser(userId, payload);
     },
     onSuccess: () => {
       toast.success(t("userDetail.settingsSaved"));
@@ -295,7 +305,7 @@ export default function UserDetail() {
             <p className="text-slate-500 text-sm mb-3">{t("userDetail.scheduledSyncOffManualOk")}</p>
           )}
           {user.icloud_auth_status === "awaiting_2fa" && (
-            <HelpBox title={t("userDetail.awaiting2faTitle")}>
+            <HelpBox title={t("userDetail.awaiting2faTitle")} className="mb-3">
               <p className="text-slate-400 text-sm">{t("authorize.step2")}</p>
               <p className="text-slate-500 text-xs mt-2">{t("authorize.telegramHint")}</p>
             </HelpBox>
@@ -303,7 +313,7 @@ export default function UserDetail() {
           {(user.icloud_auth_status === "not_authorized" ||
             user.icloud_auth_status === "reauth_required" ||
             user.icloud_auth_status === "expired") && (
-            <HelpBox title={t("userDetail.beforeSignIn")}>
+            <HelpBox title={t("userDetail.beforeSignIn")} className="mb-3">
             <ul className="list-disc list-inside space-y-1">
               <li>{t("userDetail.icloudHelp1")}</li>
               <li>{t("userDetail.icloudHelp2")}</li>
@@ -373,7 +383,7 @@ export default function UserDetail() {
             accountLabel={user.google_account_email}
           />
           {user.google_auth_status !== "authorized" && (
-            <HelpBox title={t("userDetail.googleChecklist")}>
+            <HelpBox title={t("userDetail.googleChecklist")} className="mb-3">
               <ol className="list-decimal list-inside space-y-1.5">
                 <li>{t("userDetail.googleStep1")}</li>
                 <li>{t("userDetail.googleStep2")}</li>
@@ -381,13 +391,15 @@ export default function UserDetail() {
               </ol>
             </HelpBox>
           )}
-          <ConnectGoogleButton
-            userId={userId}
-            googleAuthorized={user.google_authorized}
-            googleNeedsAuth={user.google_needs_auth}
-          />
-          <FieldHelp className="mt-3">{t("userDetail.googleConnectHelp")}</FieldHelp>
-          <div className="flex flex-wrap gap-2 mt-4">
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <ConnectGoogleButton
+              userId={userId}
+              googleAuthorized={user.google_authorized}
+              googleNeedsAuth={user.google_needs_auth}
+            />
+          </div>
+          <FieldHelp className="mb-3">{t("userDetail.googleConnectHelp")}</FieldHelp>
+          <div className="flex flex-wrap gap-2">
             <FetchCountButton
               userId={userId}
               source="google_photos"
@@ -506,67 +518,71 @@ export default function UserDetail() {
           </div>
         </Section>
 
-        <Section title={t("userDetail.immichTitle")} description={t("userDetail.immichDesc")}>
-          <label className="flex items-center gap-2 text-sm text-slate-300 mb-4 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={immichScanAfterSync}
-              onChange={(e) => setImmichScanAfterSync(e.target.checked)}
-              className="rounded"
-            />
-            {t("userDetail.immichConnect")}
-          </label>
-          {immichScanAfterSync && (
-            <div className="space-y-4">
-              {immichLibraries.data?.libraries && immichLibraries.data.libraries.length > 0 ? (
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">
-                    {t("userDetail.externalLibrary")}
-                  </label>
-                  <select
-                    value={immichLibraryId}
-                    onChange={(e) => setImmichLibraryId(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
-                  >
-                    <option value="">{t("userDetail.selectLibrary")}</option>
-                    {immichLibraries.data.libraries.map((lib) => (
-                      <option key={lib.id} value={lib.id}>
-                        {lib.name}
-                        {lib.importPaths?.length ? ` — ${lib.importPaths.join(", ")}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">
-                    {t("userDetail.externalLibraryId")}
-                  </label>
-                  <input
-                    value={immichLibraryId}
-                    onChange={(e) => setImmichLibraryId(e.target.value)}
-                    placeholder={t("userDetail.libraryUuidPlaceholder")}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono"
-                  />
-                  {immichLibraries.isError && (
-                    <p className="text-xs text-amber-400 mt-1">{t("userDetail.librariesLoadError")}</p>
-                  )}
-                </div>
-              )}
-              <p className="text-xs text-slate-500">{t("userDetail.immichPathHelp")}</p>
-              <button
-                type="button"
-                onClick={() => testImmich.mutate()}
-                disabled={testImmich.isPending || !immichLibraryId.trim()}
-                className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 px-4 py-2 rounded-lg text-sm"
-              >
-                {testImmich.isPending
-                  ? t("common.callingImmich")
-                  : t("userDetail.testLibraryScan")}
-              </button>
-            </div>
-          )}
-        </Section>
+        {immichIntegrationEnabled && (
+          <Section title={t("userDetail.immichTitle")} description={t("userDetail.immichDesc")}>
+            <label className="flex items-center gap-2 text-sm text-slate-300 mb-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={immichScanAfterSync}
+                onChange={(e) => setImmichScanAfterSync(e.target.checked)}
+                className="rounded"
+              />
+              {t("userDetail.immichConnect")}
+            </label>
+            {immichScanAfterSync && (
+              <div className="space-y-4">
+                {immichLibraries.data?.libraries && immichLibraries.data.libraries.length > 0 ? (
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">
+                      {t("userDetail.externalLibrary")}
+                    </label>
+                    <select
+                      value={immichLibraryId}
+                      onChange={(e) => setImmichLibraryId(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="">{t("userDetail.selectLibrary")}</option>
+                      {immichLibraries.data.libraries.map((lib) => (
+                        <option key={lib.id} value={lib.id}>
+                          {lib.name}
+                          {lib.importPaths?.length ? ` — ${lib.importPaths.join(", ")}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">
+                      {t("userDetail.externalLibraryId")}
+                    </label>
+                    <input
+                      value={immichLibraryId}
+                      onChange={(e) => setImmichLibraryId(e.target.value)}
+                      placeholder={t("userDetail.libraryUuidPlaceholder")}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono"
+                    />
+                    {immichLibraries.isError && (
+                      <p className="text-xs text-amber-400 mt-1">
+                        {t("userDetail.librariesLoadError")}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-slate-500">{t("userDetail.immichPathHelp")}</p>
+                <button
+                  type="button"
+                  onClick={() => testImmich.mutate()}
+                  disabled={testImmich.isPending || !immichLibraryId.trim()}
+                  className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 px-4 py-2 rounded-lg text-sm"
+                >
+                  {testImmich.isPending
+                    ? t("common.callingImmich")
+                    : t("userDetail.testLibraryScan")}
+                </button>
+              </div>
+            )}
+          </Section>
+        )}
 
         <Section title={t("userDetail.syncAllTitle")} description={t("userDetail.syncAllDesc")}>
           <FieldHelp className="mb-3">{t("userDetail.syncAllHelp")}</FieldHelp>

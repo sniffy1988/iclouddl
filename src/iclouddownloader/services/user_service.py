@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from iclouddownloader.config import get_settings
 from iclouddownloader.db.models import User
+from iclouddownloader.services.runtime_settings_service import get_effective_settings
 from iclouddownloader.paths import download_dir_for_user
 from iclouddownloader.providers.base import linked_providers
 
@@ -72,6 +73,10 @@ class UserService:
         reschedule = bool(kwargs.pop("reschedule_sync", False))
         interval_changed = False
         was_enabled = user.enabled
+
+        if not get_effective_settings().immich_enabled:
+            kwargs.pop("immich_library_id", None)
+            kwargs.pop("immich_scan_after_sync", None)
 
         for key, value in list(kwargs.items()):
             if not hasattr(user, key):
