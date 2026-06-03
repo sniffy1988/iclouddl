@@ -75,7 +75,17 @@
     "noEvents": "Подій поки немає",
     "quickLinks": "Швидкі посилання",
     "manageUsersLink": "Користувачі — синхронізація за обліковим записом",
-    "syncHistoryLink": "Історія синхронізацій — повтор при помилці"
+    "syncHistoryLink": "Історія синхронізацій — повтор при помилці",
+    "eventCountStarted": "{{user}}: почато індексацію {{source}}",
+    "eventCountProgress": "{{user}}: індексація {{source}} ({{indexed}})",
+    "eventCountDone": "{{user}}: підрахунок {{source}} готовий ({{total}})"
+  },
+  "realtime": {
+    "connected": "Онлайн",
+    "reconnecting": "Перепідключення…",
+    "offline": "Офлайн",
+    "offlineBanner": "Живі оновлення недоступні; оновлення щохвилини.",
+    "offlineTooltip": "Періодичне оновлення"
   },
   "users": {
     "title": "Користувачі",
@@ -113,7 +123,9 @@
     "colId": "ID",
     "colUser": "Користувач",
     "colStatus": "Статус",
+    "colDiscovered": "Знайдено",
     "colDownloaded": "Скачано",
+    "colSkipped": "Пропущено",
     "colFailed": "Помилки",
     "colStarted": "Початок",
     "colError": "Помилка",

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes } from "react-router-dom";
 import DebugLoggingSync from "./components/DebugLoggingSync";
 import Layout from "./components/Layout";
+import RealtimeProvider from "./components/RealtimeProvider";
 import { ToastProvider } from "./components/ToastProvider";
 import Dashboard from "./pages/Dashboard";
 import Logs from "./pages/Logs";
@@ -34,8 +35,9 @@ export default function App() {
           path="/*"
           element={
             <Protected>
-              <DebugLoggingSync />
-              <Layout>
+              <RealtimeProvider>
+                <DebugLoggingSync />
+                <Layout>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/users" element={<Users />} />
@@ -44,7 +46,8 @@ export default function App() {
                   <Route path="/logs" element={<Logs />} />
                   <Route path="/settings" element={<Settings />} />
                 </Routes>
-              </Layout>
+                </Layout>
+              </RealtimeProvider>
             </Protected>
           }
         />

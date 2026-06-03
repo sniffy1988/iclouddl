@@ -18,6 +18,17 @@ from iclouddownloader.path_template import apply_path_template
 from iclouddownloader.paths import provider_download_dir
 from iclouddownloader.providers.base import ProviderSyncResult, account_label, apply_provider_result_to_run
 from iclouddownloader.providers.cancel import drain_futures_with_cancel, is_sync_cancel_requested
+from iclouddownloader.providers.local_files import (
+    mark_photo_missing_on_disk,
+    photo_files_on_disk,
+    reconcile_stale_downloads,
+    try_adopt_existing_on_disk,
+    verify_written_file,
+)
+from iclouddownloader.providers.sync_progress import (
+    publish_sync_progress,
+    should_report_sync_progress,
+)
 from iclouddownloader.services.runtime_settings_service import get_effective_settings
 
 logger = logging.getLogger(__name__)
@@ -117,13 +128,10 @@ class GooglePhotoSyncEngine:
             return "skipped"
 
         if record.status == PhotoStatus.downloaded:
-            if record.local_path and Path(record.local_path).exists():
-                if not require_motion or (
-                    record.companion_local_path
-                    and Path(record.companion_local_path).exists()
-                ):
-                    counters["skipped"] += 1
-                    return "skipped"
+            if photo_files_on_disk(record, require_companion=require_motion):
+                counters["skipped"] += 1
+                return "skipped"
+            mark_photo_missing_on_disk(record)
 
         if not media_item_ready(item):
             counters["failed"] += 1
@@ -141,21 +149,39 @@ class GooglePhotoSyncEngine:
         dt = record.asset_date or datetime.now(timezone.utc)
         dest = _local_path(base_dir, dt, record.filename)
         variant = "dv" if (record.media_type == "video") else "d"
+        companion_dest = None
+        if require_motion:
+            companion_dest = _local_path(base_dir, dt, _motion_companion_filename(record.filename))
+
+        if try_adopt_existing_on_disk(
+            record,
+            dest,
+            companion=companion_dest,
+            require_companion=require_motion,
+            companion_media_type="motion_video" if require_motion else None,
+            checksum_fn=_sha256,
+        ):
+            counters["skipped"] += 1
+            return "skipped"
 
         try:
             data = client.download_bytes(base_url, variant=variant)
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(data)
-            record.local_path = str(dest)
+            verify_written_file(dest)
+            record.local_path = str(dest.resolve())
             record.file_size = dest.stat().st_size
             record.checksum_sha256 = _sha256(dest)
             if require_motion:
-                companion_name = _motion_companion_filename(record.filename)
-                companion_dest = _local_path(base_dir, dt, companion_name)
+                if companion_dest is None:
+                    companion_dest = _local_path(
+                        base_dir, dt, _motion_companion_filename(record.filename)
+                    )
                 video_data = client.download_bytes(base_url, variant="dv")
                 companion_dest.parent.mkdir(parents=True, exist_ok=True)
                 companion_dest.write_bytes(video_data)
-                record.companion_local_path = str(companion_dest)
+                verify_written_file(companion_dest)
+                record.companion_local_path = str(companion_dest.resolve())
                 record.companion_media_type = "motion_video"
                 record.companion_file_size = companion_dest.stat().st_size
                 record.companion_checksum_sha256 = _sha256(companion_dest)
@@ -212,6 +238,8 @@ class GooglePhotoSyncEngine:
             pending = self._pending_photos(user.id)
             counters["discovered"] = len(pending)
 
+            reconcile_stale_downloads(self.db, user.id, source=PhotoSource.google_photos)
+
             if not pending:
                 return ProviderSyncResult(
                     source=PhotoSource.google_photos,
@@ -239,8 +267,16 @@ class GooglePhotoSyncEngine:
 
                 def on_progress() -> None:
                     progress["done"] += 1
-                    if progress["done"] % 10 == 0:
+                    done = progress["done"]
+                    if should_report_sync_progress(done):
                         self.db.commit()
+                        publish_sync_progress(
+                            self.db,
+                            user,
+                            sync_run_id,
+                            counters,
+                            source=PhotoSource.google_photos,
+                        )
 
                 stopped = drain_futures_with_cancel(
                     self.db, sync_run_id, futures, on_progress=on_progress

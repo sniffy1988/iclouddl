@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { api } from "../api/client";
 import LanguageSwitcher from "./LanguageSwitcher";
+import RealtimeIndicator from "./RealtimeIndicator";
 
 const navItems = [
   { to: "/", key: "dashboard" as const },
@@ -35,6 +36,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <LanguageSwitcher />
+        <RealtimeIndicator />
         <button
           onClick={() => api.logout().then(() => (window.location.href = "/login"))}
           className="text-sm text-slate-500 hover:text-slate-300 mt-4"

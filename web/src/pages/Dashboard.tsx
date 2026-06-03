@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { useToast } from "../components/ToastProvider";
+import { useRealtime, useRealtimeRefetchInterval } from "../hooks/useRealtime";
 
 function StatCard({ label, value }: { label: string; value: number | string }) {
   return (
@@ -17,12 +17,13 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
 export default function Dashboard() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const { data: stats, refetch } = useQuery({
+  const { recentEvents } = useRealtime();
+  const pollInterval = useRealtimeRefetchInterval(false);
+  const { data: stats } = useQuery({
     queryKey: ["stats"],
     queryFn: api.stats,
-    refetchInterval: 15000,
+    refetchInterval: pollInterval,
   });
-  const [events, setEvents] = useState<string[]>([]);
   const toast = useToast();
 
   const triggerDue = useMutation({
@@ -35,26 +36,6 @@ export default function Dashboard() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
-
-  useEffect(() => {
-    const es = new EventSource("/api/events/sync", { withCredentials: true });
-    const onEvent = (e: MessageEvent) => {
-      try {
-        const d = JSON.parse(e.data);
-        setEvents((prev) => [`${d.type} ${d.apple_id || ""}`, ...prev].slice(0, 20));
-        if (d.type?.startsWith("sync.") || d.type?.startsWith("count.")) {
-          refetch();
-          qc.invalidateQueries({ queryKey: ["users"] });
-          qc.invalidateQueries({ queryKey: ["sync-runs"] });
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-    es.addEventListener("message", onEvent);
-    es.onmessage = onEvent;
-    return () => es.close();
-  }, [refetch, qc]);
 
   if (!stats) return <div>{t("common.loading")}</div>;
 
@@ -88,8 +69,8 @@ export default function Dashboard() {
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <h3 className="font-medium mb-3">{t("dashboard.liveEvents")}</h3>
           <ul className="text-sm text-slate-400 space-y-1 max-h-64 overflow-auto">
-            {events.length === 0 && <li>{t("dashboard.noEvents")}</li>}
-            {events.map((e, i) => (
+            {recentEvents.length === 0 && <li>{t("dashboard.noEvents")}</li>}
+            {recentEvents.map((e, i) => (
               <li key={i}>{e}</li>
             ))}
           </ul>

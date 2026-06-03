@@ -2,16 +2,18 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { useRealtimeRefetchInterval } from "../hooks/useRealtime";
 import { formatDateTime } from "../utils/formatDateTime";
 import StopSyncButton from "../components/StopSyncButton";
 import SyncNowButton from "../components/SyncNowButton";
 
 export default function SyncRuns() {
   const { t } = useTranslation();
+  const pollInterval = useRealtimeRefetchInterval(false);
   const { data: runs, isLoading } = useQuery({
     queryKey: ["sync-runs"],
     queryFn: () => api.syncRuns({ limit: 100 }),
-    refetchInterval: 10000,
+    refetchInterval: pollInterval,
   });
 
   if (isLoading) return <div>{t("common.loading")}</div>;

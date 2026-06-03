@@ -23,7 +23,8 @@ dependencies = [
     "uvicorn[standard]",
     "python-multipart",
     "bcrypt",
-    "sse-starlette",
+    "redis>=5",
+    "rq>=2",
     "google-auth-oauthlib",
     "google-auth",
     "cryptography",
@@ -34,6 +35,7 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "httpx",
+    "fakeredis",
 ]
 
 [project.scripts]

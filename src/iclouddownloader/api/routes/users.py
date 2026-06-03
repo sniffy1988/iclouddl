@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from iclouddownloader.api.deps import get_db, require_auth
@@ -17,8 +17,9 @@ from iclouddownloader.api.schemas import (
     UserResponse,
     UserUpdate,
 )
+from iclouddownloader.jobs.queue import enqueue_count, enqueue_sync
 from iclouddownloader.services.sync_service import SyncInProgressError
-from iclouddownloader.db.models import AuthChallengeStatus, PhotoSource
+from iclouddownloader.db.models import PhotoSource
 from iclouddownloader.providers.base import scope_for_source
 from iclouddownloader.api.schemas import PhotoSourceParam
 from iclouddownloader.services.auth_service import AuthService
@@ -38,7 +39,6 @@ def list_users(db: Session = Depends(get_db), _: None = Depends(require_auth)):
 @router.post("", response_model=UserResponse, status_code=201)
 def create_user(
     body: UserCreate,
-    background_tasks: BackgroundTasks,
     fetch_count: bool = False,
     db: Session = Depends(get_db),
     _: None = Depends(require_auth),
@@ -53,33 +53,13 @@ def create_user(
     notifier.user_added(user)
 
     if fetch_count and user.apple_id and AuthService(db).is_authorized(user):
-
-        def _count(uid: int):
-            from iclouddownloader.db.session import get_session_factory
-
-            sdb = get_session_factory()()
-            try:
-                SyncService(sdb, notifier=notifier).fetch_icloud_photo_count(uid)
-            except Exception:
-                u = UserService(sdb).get_user(uid)
-                if u and u.last_sync_status in (
-                    "counting",
-                    "counting_icloud",
-                    "counting_google",
-                ):
-                    u.last_sync_status = "idle"
-                    sdb.commit()
-            finally:
-                sdb.close()
-
-        background_tasks.add_task(_count, user.id)
+        enqueue_count(user.id, PhotoSource.icloud)
 
     return SyncService(db).user_to_response(user)
 
 
 @router.post("/fetch-all-counts")
 def fetch_all_photo_counts(
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _: None = Depends(require_auth),
 ):
@@ -100,17 +80,6 @@ def fetch_all_photo_counts(
             continue
         queued.append(user.id)
 
-    def _run(uid: int):
-        from iclouddownloader.db.session import get_session_factory
-
-        sdb = get_session_factory()()
-        try:
-            SyncService(sdb).fetch_icloud_photo_count(uid)
-        except Exception:
-            pass
-        finally:
-            sdb.close()
-
     for uid in queued:
         user = user_svc.get_user(uid)
         if user:
@@ -118,7 +87,7 @@ def fetch_all_photo_counts(
     db.commit()
 
     for uid in queued:
-        background_tasks.add_task(_run, uid)
+        enqueue_count(uid, PhotoSource.icloud)
 
     return {
         "ok": True,
@@ -194,7 +163,6 @@ def get_photo_counts(user_id: int, db: Session = Depends(get_db), _: None = Depe
 @router.post("/{user_id}/fetch-count", response_model=FetchCountResponse)
 def fetch_photo_count(
     user_id: int,
-    background_tasks: BackgroundTasks,
     source: PhotoSourceParam = "icloud",
     db: Session = Depends(get_db),
     _: None = Depends(require_auth),
@@ -230,18 +198,8 @@ def fetch_photo_count(
             already_running=True,
         )
 
-    notifier = AppNotifier()
-
-    def _run(src: PhotoSource = photo_source):
-        from iclouddownloader.db.session import get_session_factory
-
-        sdb = get_session_factory()()
-        try:
-            SyncService(sdb, notifier=notifier).fetch_photo_count(user_id, src)
-        finally:
-            sdb.close()
-
-    background_tasks.add_task(_run)
+    sync_svc.mark_count_queued(user, photo_source)
+    enqueue_count(user_id, photo_source)
     label = "iCloud" if photo_source == PhotoSource.icloud else "Google Photos"
     return FetchCountResponse(
         ok=True,
@@ -254,7 +212,6 @@ def fetch_photo_count(
 @router.post("/{user_id}/sync", response_model=TriggerSyncResponse)
 def trigger_sync(
     user_id: int,
-    background_tasks: BackgroundTasks,
     source: PhotoSourceParam | None = None,
     db: Session = Depends(get_db),
     _: None = Depends(require_auth),
@@ -280,18 +237,7 @@ def trigger_sync(
         )
 
     sync_svc.mark_sync_queued(user_id)
-    notifier = AppNotifier()
-
-    def _run(src: PhotoSource | None = photo_source):
-        from iclouddownloader.db.session import get_session_factory
-
-        sdb = get_session_factory()()
-        try:
-            SyncService(sdb, notifier=notifier).trigger_sync(user_id, source=src)
-        finally:
-            sdb.close()
-
-    background_tasks.add_task(_run)
+    enqueue_sync(user_id, photo_source)
     return TriggerSyncResponse(
         ok=True,
         message="Sync job started",

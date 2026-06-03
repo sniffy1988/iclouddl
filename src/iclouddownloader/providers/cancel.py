@@ -37,8 +37,12 @@ def drain_futures_with_cancel(
     futures: dict[Future, object],
     *,
     on_progress=None,
+    on_future_done=None,
 ) -> bool:
     """Wait for futures; return True if stopped due to cancel request."""
+    import logging
+
+    log = logging.getLogger(__name__)
     pending = set(futures.keys())
     while pending:
         if is_sync_cancel_requested(db, sync_run_id):
@@ -48,9 +52,13 @@ def drain_futures_with_cancel(
         done, pending = wait(pending, timeout=0.5, return_when=FIRST_COMPLETED)
         for future in done:
             try:
-                future.result()
-            except Exception:
-                pass
+                result = future.result()
+                if on_future_done is not None:
+                    on_future_done(result, error=None)
+            except Exception as exc:
+                log.exception("Sync worker future failed: %s", exc)
+                if on_future_done is not None:
+                    on_future_done(None, error=exc)
             if on_progress:
                 on_progress()
     return False

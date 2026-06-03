@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import tempfile
 
+import fakeredis
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -15,6 +16,7 @@ _tmp = tempfile.mkdtemp()
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["BASE_DOWNLOAD_DIR"] = _tmp
 os.environ["COOKIE_DIR"] = _tmp + "/cookies"
+os.environ["REDIS_URL"] = "redis://localhost:6379/15"
 
 from iclouddownloader.api.app import create_app  # noqa: E402
 from iclouddownloader.config import get_settings  # noqa: E402
@@ -32,6 +34,24 @@ _test_engine = create_engine(
 session_mod._engine = _test_engine
 session_mod._SessionLocal = sessionmaker(bind=_test_engine, autocommit=False, autoflush=False)
 Base.metadata.create_all(_test_engine)
+
+
+@pytest.fixture(autouse=True)
+def fake_redis(monkeypatch):
+    import iclouddownloader.redis.client as redis_client
+
+    events_server = fakeredis.FakeStrictRedis(decode_responses=True)
+    rq_server = fakeredis.FakeStrictRedis(decode_responses=False)
+    monkeypatch.setattr(redis_client, "_client", events_server)
+    monkeypatch.setattr(redis_client, "_subscriber_client", events_server)
+    monkeypatch.setattr(redis_client, "_rq_client", rq_server)
+    monkeypatch.setattr(redis_client, "get_redis", lambda: events_server)
+    monkeypatch.setattr(redis_client, "get_redis_subscriber", lambda: events_server)
+    monkeypatch.setattr(redis_client, "get_rq_redis", lambda: rq_server)
+    yield events_server
+    redis_client._client = None
+    redis_client._subscriber_client = None
+    redis_client._rq_client = None
 
 
 @pytest.fixture

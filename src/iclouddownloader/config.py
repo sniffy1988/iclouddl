@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     skip_live_companions: bool = False
     skip_motion_companions: bool = False
 
+    redis_url: str = "redis://localhost:6379/0"
+    redis_events_channel: str = "icd:events"
+    rq_sync_queue: str = "sync"
+    rq_count_queue: str = "count"
+
 
 class EffectiveSettings(Settings):
     """Env settings merged with runtime_settings row (Telegram, Immich, sync defaults)."""

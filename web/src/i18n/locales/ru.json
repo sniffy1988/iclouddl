@@ -76,7 +76,17 @@
     "noEvents": "Событий пока нет",
     "quickLinks": "Быстрые ссылки",
     "manageUsersLink": "Пользователи — синхронизация по аккаунту",
-    "syncHistoryLink": "История синхронизаций — повтор при ошибке"
+    "syncHistoryLink": "История синхронизаций — повтор при ошибке",
+    "eventCountStarted": "{{user}}: начата индексация {{source}}",
+    "eventCountProgress": "{{user}}: индексация {{source}} ({{indexed}})",
+    "eventCountDone": "{{user}}: подсчёт {{source}} готов ({{total}})"
+  },
+  "realtime": {
+    "connected": "Онлайн",
+    "reconnecting": "Переподключение…",
+    "offline": "Офлайн",
+    "offlineBanner": "Живые обновления недоступны; обновление раз в минуту.",
+    "offlineTooltip": "Периодическое обновление"
   },
   "users": {
     "title": "Пользователи",
@@ -114,7 +124,9 @@
     "colId": "ID",
     "colUser": "Пользователь",
     "colStatus": "Статус",
+    "colDiscovered": "Найдено",
     "colDownloaded": "Скачано",
+    "colSkipped": "Пропущено",
     "colFailed": "Ошибки",
     "colStarted": "Начало",
     "colError": "Ошибка",

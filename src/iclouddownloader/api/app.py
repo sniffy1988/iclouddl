@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -8,7 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from iclouddownloader.api.routes import auth, google_auth, logs, photos, settings, sync, users
+from iclouddownloader.api.routes import auth, google_auth, logs, photos, settings, sync, users, ws
+from iclouddownloader.api.realtime import redis_events_bridge
+from iclouddownloader.redis.client import ping_redis
 from iclouddownloader.api.web_static import safe_dist_file
 from iclouddownloader.logging_setup import (
     configure_logging,
@@ -22,7 +25,17 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging(force=True)
-    yield
+    stop = asyncio.Event()
+    bridge = asyncio.create_task(redis_events_bridge(stop))
+    try:
+        yield
+    finally:
+        stop.set()
+        bridge.cancel()
+        try:
+            await bridge
+        except asyncio.CancelledError:
+            pass
 
 
 def create_app() -> FastAPI:
@@ -59,11 +72,14 @@ def create_app() -> FastAPI:
     app.include_router(sync.router)
     app.include_router(settings.router)
     app.include_router(logs.router)
+    app.include_router(ws.router)
 
     @app.get("/api/health")
     def health():
+        redis_ok = ping_redis()
         return {
-            "status": "ok",
+            "status": "ok" if redis_ok else "degraded",
+            "redis": redis_ok,
             "logging_level": get_logging_level(),
             "debug_logging_enabled": get_logging_level() == "DEBUG",
         }

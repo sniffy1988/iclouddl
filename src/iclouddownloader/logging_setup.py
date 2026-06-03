@@ -245,10 +245,11 @@ class DatabaseLogHandler(logging.Handler):
             self.handleError(record)
 
 
-def configure_logging(force: bool = False) -> LoggingOptions:
+def configure_logging(force: bool = False, *, persist_to_db: bool | None = None) -> LoggingOptions:
     """Apply console + optional DB handlers from runtime settings."""
     global _configured
     opts = _read_options()
+    write_db = opts.persist_to_db if persist_to_db is None else persist_to_db
     root = logging.getLogger()
     root.handlers.clear()
 
@@ -257,7 +258,7 @@ def configure_logging(force: bool = False) -> LoggingOptions:
     console.setFormatter(ColoredConsoleFormatter(use_color=console_use_color()))
     root.addHandler(console)
 
-    if opts.persist_to_db:
+    if write_db:
         db_handler = DatabaseLogHandler()
         db_handler.setLevel(opts.db_level)
         root.addHandler(db_handler)
@@ -272,9 +273,14 @@ def configure_logging(force: bool = False) -> LoggingOptions:
     root.info(
         "Logging configured (level=%s, db=%s)",
         opts.level_name,
-        opts.persist_to_db,
+        write_db,
     )
     return opts
+
+
+def configure_rq_job_logging(force: bool = False) -> LoggingOptions:
+    """Console-only logging inside RQ jobs (avoids SQLite contention with the API)."""
+    return configure_logging(force=force, persist_to_db=False)
 
 
 def ensure_logging_configured() -> None:

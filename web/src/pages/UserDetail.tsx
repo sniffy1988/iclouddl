@@ -30,6 +30,7 @@ import {
   hasSavedAppleId,
 } from "../utils/icloudActions";
 import { googleSectionDescription, icloudSectionDescription } from "../utils/providerStatus";
+import { useRealtime, realtimeRefetchInterval, useRealtimeRefetchInterval } from "../hooks/useRealtime";
 
 function Section({
   title,
@@ -59,21 +60,28 @@ export default function UserDetail() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const { status: realtimeStatus } = useRealtime();
+
+  const isCountingStatus = (activity: string | undefined) =>
+    activity === "counting" ||
+    activity === "counting_icloud" ||
+    activity === "counting_google";
+
+  const isSyncingStatus = (activity: string | undefined) =>
+    activity === "queued" || activity === "syncing";
+
+  const countingPoll = useRealtimeRefetchInterval(false, true, false);
+  const syncingPoll = useRealtimeRefetchInterval(false, false, true);
+
   const { data: user } = useQuery({
     queryKey: ["user", userId],
     queryFn: () => api.getUser(userId),
     enabled: !!userId,
     refetchInterval: (q) => {
       const activity = q.state.data?.activity_status;
-      return (
-        activity === "queued" ||
-        activity === "syncing" ||
-        activity === "counting" ||
-        activity === "counting_icloud" ||
-        activity === "counting_google"
-      )
-        ? 3000
-        : false;
+      if (isCountingStatus(activity)) return countingPoll;
+      if (isSyncingStatus(activity)) return syncingPoll;
+      return realtimeRefetchInterval(realtimeStatus, false);
     },
   });
 
@@ -81,24 +89,30 @@ export default function UserDetail() {
     queryKey: ["photo-counts", userId],
     queryFn: () => api.photoCounts(userId),
     enabled: !!userId,
-    refetchInterval:
-      user?.activity_status === "counting" ||
-      user?.activity_status === "counting_icloud" ||
-      user?.activity_status === "counting_google"
-        ? 3000
-        : false,
+    refetchInterval: () => {
+      const act = user?.activity_status;
+      if (isCountingStatus(act)) return countingPoll;
+      if (isSyncingStatus(act)) return syncingPoll;
+      return false;
+    },
   });
   const { data: photos } = useQuery({
     queryKey: ["photos", userId],
     queryFn: () => api.photos(userId),
     enabled: !!userId,
+    refetchInterval: () => {
+      const act = user?.activity_status;
+      if (isCountingStatus(act)) return countingPoll;
+      if (isSyncingStatus(act)) return syncingPoll;
+      return false;
+    },
   });
   const { data: syncRuns } = useQuery({
     queryKey: ["sync-runs", userId],
     queryFn: () => api.syncRuns({ user_id: userId, limit: 10 }),
     enabled: !!userId,
-    refetchInterval:
-      user?.activity_status === "syncing" || user?.activity_status === "queued" ? 3000 : false,
+    refetchInterval: () =>
+      isSyncingStatus(user?.activity_status) ? syncingPoll : false,
   });
   const { data: appSettings } = useQuery({
     queryKey: ["settings"],
@@ -210,6 +224,11 @@ export default function UserDetail() {
 
   const isCountingIcloud = user.activity_status === "counting_icloud";
   const isCountingGoogle = user.activity_status === "counting_google";
+
+  const icloudPhotoCount =
+    user.icloud_photos_count ?? counts?.icloud_photos_count ?? null;
+  const googlePhotoCount =
+    user.google_photos_count ?? counts?.google_photos_count ?? null;
   const syncBusy = user.active_syncs_by_scope ?? {};
   const icloudCountOk = canCountIcloud(user, syncBusy);
   const icloudSyncOk = canSyncIcloud(user, syncBusy);
@@ -272,16 +291,16 @@ export default function UserDetail() {
           <p className="text-slate-500 text-sm">{t("userDetail.icloudPhotos")}</p>
           <p className="text-2xl font-semibold mt-1">
             {isCountingIcloud
-              ? (user.icloud_photos_count ?? 0).toLocaleString()
-              : (user.icloud_photos_count?.toLocaleString() ?? t("common.dash"))}
+              ? (icloudPhotoCount ?? 0).toLocaleString()
+              : (icloudPhotoCount?.toLocaleString() ?? t("common.dash"))}
           </p>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <p className="text-slate-500 text-sm">{t("userDetail.googlePhotos")}</p>
           <p className="text-2xl font-semibold mt-1">
             {isCountingGoogle
-              ? (user.google_photos_count ?? 0).toLocaleString()
-              : (user.google_photos_count?.toLocaleString() ?? t("common.dash"))}
+              ? (googlePhotoCount ?? 0).toLocaleString()
+              : (googlePhotoCount?.toLocaleString() ?? t("common.dash"))}
           </p>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
@@ -639,7 +658,9 @@ export default function UserDetail() {
           <tr className="text-slate-500 border-b border-slate-800">
             <th className="text-left py-2">{t("userDetail.colRun")}</th>
             <th className="text-left py-2">{t("syncRuns.colStatus")}</th>
+            <th className="text-left py-2">{t("syncRuns.colDiscovered")}</th>
             <th className="text-left py-2">{t("syncRuns.colDownloaded")}</th>
+            <th className="text-left py-2">{t("syncRuns.colSkipped")}</th>
             <th className="text-left py-2">{t("syncRuns.colFailed")}</th>
             <th className="text-left py-2">{t("syncRuns.colStarted")}</th>
           </tr>
@@ -651,7 +672,9 @@ export default function UserDetail() {
               <td className="py-2 capitalize">
                 {t(`syncRunStatus.${r.status}`, { defaultValue: r.status })}
               </td>
+              <td className="py-2">{r.photos_discovered}</td>
               <td className="py-2">{r.photos_downloaded}</td>
+              <td className="py-2">{r.photos_skipped}</td>
               <td className="py-2">{r.photos_failed}</td>
               <td className="py-2 text-slate-500">{formatDateTime(r.started_at)}</td>
             </tr>

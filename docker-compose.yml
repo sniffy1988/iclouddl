@@ -1,5 +1,14 @@
 # SQLite file DB — all persistent data lives in ./data/ on the host
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   migrate:
     build: .
     env_file: .env
@@ -20,6 +29,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-sqlite:////data/iclouddownloader.db}
       BASE_DOWNLOAD_DIR: /data/downloads
       COOKIE_DIR: /data/cookies
+      REDIS_URL: redis://redis:6379/0
       WEB_HOST: 0.0.0.0
       WEB_PORT: ${WEB_PORT:-8765}
       FORCE_COLOR: ${FORCE_COLOR:-1}
@@ -28,6 +38,8 @@ services:
     volumes:
       - ./data:/data
     depends_on:
+      redis:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
     command: ["iclouddownloader", "web", "start"]
@@ -40,10 +52,13 @@ services:
       DATABASE_URL: ${DATABASE_URL:-sqlite:////data/iclouddownloader.db}
       BASE_DOWNLOAD_DIR: /data/downloads
       COOKIE_DIR: /data/cookies
+      REDIS_URL: redis://redis:6379/0
       FORCE_COLOR: ${FORCE_COLOR:-1}
     volumes:
       - ./data:/data
     depends_on:
+      redis:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
     command: ["iclouddownloader", "daemon", "start"]

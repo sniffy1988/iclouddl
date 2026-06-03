@@ -75,7 +75,17 @@
     "noEvents": "Noch keine Ereignisse",
     "quickLinks": "Schnelllinks",
     "manageUsersLink": "Benutzer verwalten — Sync pro Konto",
-    "syncHistoryLink": "Sync-Verlauf — fehlgeschlagene erneut starten"
+    "syncHistoryLink": "Sync-Verlauf — fehlgeschlagene erneut starten",
+    "eventCountStarted": "{{user}}: Indexierung {{source}} gestartet",
+    "eventCountProgress": "{{user}}: Indexierung {{source}} ({{indexed}})",
+    "eventCountDone": "{{user}}: {{source}} Zählung fertig ({{total}})"
+  },
+  "realtime": {
+    "connected": "Live",
+    "reconnecting": "Verbinde…",
+    "offline": "Offline",
+    "offlineBanner": "Live-Updates nicht verfügbar; Aktualisierung jede Minute.",
+    "offlineTooltip": "Periodische Aktualisierung"
   },
   "users": {
     "title": "Benutzer",
@@ -113,7 +123,9 @@
     "colId": "ID",
     "colUser": "Benutzer",
     "colStatus": "Status",
+    "colDiscovered": "Gefunden",
     "colDownloaded": "Heruntergeladen",
+    "colSkipped": "Übersprungen",
     "colFailed": "Fehler",
     "colStarted": "Gestartet",
     "colError": "Fehler",

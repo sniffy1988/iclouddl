@@ -8,6 +8,7 @@ import { formatDateTime } from "../utils/formatDateTime";
 import StatusPill from "../components/StatusPill";
 import { formatSyncInterval } from "../utils/syncSchedule";
 import { useToast } from "../components/ToastProvider";
+import { useRealtime, realtimeRefetchInterval } from "../hooks/useRealtime";
 
 function libraryTotal(user: User): number | null {
   const icloud = user.icloud_photos_count;
@@ -49,10 +50,15 @@ export default function Users() {
     users?.some((u) =>
       ["counting", "counting_icloud", "counting_google"].includes(u.activity_status)
     ) ?? false;
+  const { status: realtimeStatus } = useRealtime();
   const { data: users, isLoading } = useQuery({
     queryKey: ["users"],
     queryFn: api.users,
-    refetchInterval: (q) => (hasCounting(q.state.data) ? 3000 : 10000),
+    refetchInterval: (q) => {
+      const data = q.state.data as User[] | undefined;
+      if (hasCounting(data)) return 3000;
+      return realtimeRefetchInterval(realtimeStatus, false);
+    },
   });
 
   const [showAdd, setShowAdd] = useState(false);

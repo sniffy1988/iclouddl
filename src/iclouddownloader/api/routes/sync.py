@@ -1,17 +1,12 @@
-import json
-from dataclasses import asdict
-
-from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sse_starlette.sse import EventSourceResponse
 
 from iclouddownloader.api.deps import get_db, require_auth
 from iclouddownloader.api.schemas import DashboardStats, SyncRunResponse
 from iclouddownloader.db.models import SyncRunStatus
-from iclouddownloader.events import get_event_bus
+from iclouddownloader.jobs.queue import enqueue_sync
 from iclouddownloader.services.sync_service import SyncInProgressError, SyncService
 from iclouddownloader.services.user_service import UserService
-from iclouddownloader.notifications import AppNotifier
 
 router = APIRouter(tags=["sync"])
 
@@ -36,14 +31,12 @@ def dashboard_stats(db: Session = Depends(get_db), _: None = Depends(require_aut
 
 @router.post("/api/sync/trigger-due")
 def trigger_due_syncs(
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _: None = Depends(require_auth),
 ):
     """Manually trigger sync for all enabled users that are due."""
     sync_svc = SyncService(db)
     user_svc = UserService(db)
-    notifier = AppNotifier()
     queued: list[int] = []
     skipped: list[int] = []
 
@@ -55,17 +48,8 @@ def trigger_due_syncs(
         except SyncInProgressError:
             skipped.append(user.id)
 
-    def _run(uid: int):
-        from iclouddownloader.db.session import get_session_factory
-
-        sdb = get_session_factory()()
-        try:
-            SyncService(sdb, notifier=notifier).trigger_sync(uid)
-        finally:
-            sdb.close()
-
     for uid in queued:
-        background_tasks.add_task(_run, uid)
+        enqueue_sync(uid)
 
     return {
         "ok": True,
@@ -73,14 +57,3 @@ def trigger_due_syncs(
         "skipped_already_running": skipped,
         "message": f"Started {len(queued)} sync job(s)",
     }
-
-
-@router.get("/api/events/sync")
-async def sync_events(_: None = Depends(require_auth)):
-    bus = get_event_bus()
-
-    async def generator():
-        async for event in bus.subscribe():
-            yield {"event": event.type, "data": json.dumps(asdict(event))}
-
-    return EventSourceResponse(generator())

@@ -16,13 +16,15 @@ usage() {
 Usage: ./start.sh [command]
 
 Commands:
-  up, start     Build, migrate, and start api + worker (default)
-  logs          Follow api, worker, and db-viewer logs (colorful when FORCE_COLOR=1)
+  up, start     Build, migrate, and start redis + api + worker (default)
+  logs          Follow redis, api, worker, and db-viewer logs (colorful when FORCE_COLOR=1)
   down          Stop containers
   migrate       Run Alembic migrations only (Docker)
   help          Show this help
 
 Without Docker: any command runs the local launcher (./scripts/start-local.sh).
+
+Redis is required for background sync/count jobs and live WebSocket updates (/api/ws).
 
 DB viewer (Docker, profile dbviewer): http://127.0.0.1:8766 by default.
   Set DB_VIEWER_ENABLED=0 in .env to disable. Optional DB_VIEWER_PASSWORD for SQLite.
@@ -81,6 +83,7 @@ if ! use_docker; then
   case "$cmd" in
     up|start|"")
       echo "Docker not found — starting locally (Python + SQLite in ./data/)..."
+      echo "  Redis is required; ./scripts/start-local.sh will try Docker or redis-server."
       echo ""
       exec "$ROOT/scripts/start-local.sh"
       ;;
@@ -102,7 +105,7 @@ mkdir -p data/downloads data/cookies
 
 case "$cmd" in
   logs)
-    services=(api worker)
+    services=(redis api worker)
     enabled="$(env_var_from_dotenv DB_VIEWER_ENABLED 1)"
     case "$enabled" in
       0|false|no|off|FALSE|NO|OFF) ;;
@@ -118,7 +121,7 @@ case "$cmd" in
     exec "$ROOT/scripts/compose.sh" run --rm migrate
     ;;
   up|start|"")
-    echo "Building image (web UI + app), running migrations, starting api + worker..."
+    echo "Building image (web UI + app), running migrations, starting redis + api + worker..."
     echo "  (migrate service runs alembic upgrade head; api/worker start after it succeeds)"
     "$ROOT/scripts/compose.sh" up -d --build
 
@@ -139,6 +142,7 @@ case "$cmd" in
 
     echo ""
     echo "iCloud Photo Downloader is running (Docker)."
+    echo "  Stack:   redis + api (WebSocket /api/ws) + worker (RQ)"
     echo "  Web UI:  http://localhost:${WEB_PORT}"
     echo "  Login:   create admin on first visit (stored in database)"
     echo "  Data:    ./data/iclouddownloader.db"

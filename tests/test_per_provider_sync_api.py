@@ -69,9 +69,9 @@ def test_trigger_sync_passes_source_query(client, db_session):
     db_session.commit()
     db_session.refresh(user)
 
-    with patch.object(SyncService, "trigger_sync") as mock_trigger:
+    with patch("iclouddownloader.api.routes.users.enqueue_sync") as mock_enqueue:
         r = client.post(f"/api/users/{user.id}/sync?source=icloud")
         assert r.status_code == 200
         assert r.json()["ok"] is True
         assert r.json()["source"] == "icloud"
-        mock_trigger.assert_called_once()
+        mock_enqueue.assert_called_once_with(user.id, PhotoSource.icloud)

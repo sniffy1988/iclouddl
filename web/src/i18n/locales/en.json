@@ -76,7 +76,18 @@
     "noEvents": "No events yet",
     "quickLinks": "Quick links",
     "manageUsersLink": "Manage users — sync per account",
-    "syncHistoryLink": "View sync history — retry failed runs"
+    "syncHistoryLink": "View sync history — retry failed runs",
+    "eventCountStarted": "{{user}}: started indexing {{source}}",
+    "eventCountProgress": "{{user}}: indexing {{source}} ({{indexed}})",
+    "eventCountDone": "{{user}}: {{source}} count ready ({{total}})",
+    "eventSyncProgress": "{{user}}: downloading ({{downloaded}} ok, {{failed}} failed)"
+  },
+  "realtime": {
+    "connected": "Live",
+    "reconnecting": "Reconnecting…",
+    "offline": "Offline",
+    "offlineBanner": "Live updates unavailable; refreshing every minute.",
+    "offlineTooltip": "Using periodic refresh"
   },
   "users": {
     "title": "Users",
@@ -114,7 +125,9 @@
     "colId": "ID",
     "colUser": "User",
     "colStatus": "Status",
-    "colDownloaded": "Downloaded",
+    "colDiscovered": "Discovered",
+    "colDownloaded": "This run",
+    "colSkipped": "Skipped",
     "colFailed": "Failed",
     "colStarted": "Started",
     "colError": "Error",
@@ -220,7 +233,7 @@
     "syncInProgress": "Sync in progress — this page refreshes automatically",
     "icloudPhotos": "iCloud photos",
     "googlePhotos": "Google photos",
-    "downloadedAll": "Downloaded (all)",
+    "downloadedAll": "In library (on disk)",
     "remainingEst": "Remaining (est.)",
     "icloudTitle": "iCloud",
     "icloudDesc": "Authorize with Apple ID, password, and 2FA. Count indexes metadata; Sync downloads files.",

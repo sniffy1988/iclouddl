@@ -92,23 +92,29 @@ def index_library_to_db(
     api: Any,
     *,
     commit_every: int = 200,
+    progress_every: int = 10,
     on_progress: Callable[[dict[str, int]], None] | None = None,
 ) -> dict[str, int]:
     """Walk iCloud library and fill ``photos`` table (metadata only)."""
     stats = {"indexed": 0, "created": 0, "updated": 0}
     pending_commit = 0
 
+    def _maybe_report_progress() -> None:
+        if not on_progress:
+            return
+        if stats["indexed"] == 1 or stats["indexed"] % progress_every == 0:
+            on_progress(dict(stats))
+
     for api_photo in iter_library_photos(api):
         action = upsert_photo_record(db, user.id, api_photo)
         stats["indexed"] += 1
         stats[action] += 1
         pending_commit += 1
+        _maybe_report_progress()
 
         if pending_commit >= commit_every:
             db.commit()
             pending_commit = 0
-            if on_progress:
-                on_progress(dict(stats))
 
     db.commit()
     if on_progress:

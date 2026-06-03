@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -119,7 +122,20 @@ class SyncService:
         )
         return {"downloaded_count": downloaded, "tracked_count": tracked}
 
-    def build_photo_count_result(self, user: User, source: PhotoSource | None = None) -> dict:
+    def build_photo_count_result(
+        self,
+        user: User,
+        source: PhotoSource | None = None,
+        *,
+        reconcile: bool | None = None,
+    ) -> dict:
+        from iclouddownloader.providers.local_files import reconcile_stale_downloads
+
+        if reconcile is None:
+            reconcile = user.last_sync_status != "syncing"
+        if reconcile:
+            reconcile_stale_downloads(self.db, user.id, source=source)
+            self.db.commit()
         local = self.get_local_photo_stats(user.id)
         icloud_stats = self._stats_for_source(user.id, PhotoSource.icloud)
         google_stats = self._stats_for_source(user.id, PhotoSource.google_photos)
@@ -230,6 +246,27 @@ class SyncService:
             )
         )
 
+    def mark_count_queued(self, user: User, source: PhotoSource) -> None:
+        """Persist counting state before RQ picks up the job (API + UI refetch)."""
+        status = (
+            "counting_icloud" if source == PhotoSource.icloud else "counting_google"
+        )
+        user.last_sync_status = status
+        if source == PhotoSource.icloud:
+            user.icloud_photos_count = 0
+        else:
+            user.google_photos_count = 0
+        self.db.commit()
+        self._event(user, "count.started", source)
+        self._event(
+            user,
+            "count.progress",
+            source,
+            indexed=0,
+            created=0,
+            updated=0,
+        )
+
     def fetch_photo_count(
         self,
         user_id: int,
@@ -249,16 +286,24 @@ class SyncService:
         return self._fetch_google_photo_count(user)
 
     def _fetch_icloud_photo_count(self, user: User, password: str | None) -> dict:
-        self._event(user, "count.started", PhotoSource.icloud)
-        if self.notifier:
+        if user.last_sync_status not in ("counting", "counting_icloud"):
+            self.mark_count_queued(user, PhotoSource.icloud)
+        elif self.notifier:
             self.notifier.count_started(user)
-        user.last_sync_status = "counting_icloud"
-        user.icloud_photos_count = 0
-        self.db.commit()
 
         try:
+            logger.info("Connecting to iCloud for user %s (%s)...", user.id, account_label(user))
             cookie_dir = cookie_dir_for_user(user.id)
             api = get_pyicloud_service(user, password=password, cookie_directory=cookie_dir)
+            logger.info("iCloud session ready for user %s, walking library...", user.id)
+            self._event(
+                user,
+                "count.progress",
+                PhotoSource.icloud,
+                indexed=0,
+                created=0,
+                updated=0,
+            )
 
             def on_progress(stats: dict[str, int]) -> None:
                 user.icloud_photos_count = stats["indexed"]
@@ -299,12 +344,10 @@ class SyncService:
             raise
 
     def _fetch_google_photo_count(self, user: User) -> dict:
-        self._event(user, "count.started", PhotoSource.google_photos)
-        if self.notifier:
+        if user.last_sync_status not in ("counting", "counting_google"):
+            self.mark_count_queued(user, PhotoSource.google_photos)
+        elif self.notifier:
             self.notifier.count_started(user)
-        user.last_sync_status = "counting_google"
-        user.google_photos_count = 0
-        self.db.commit()
 
         try:
 

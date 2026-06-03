@@ -47,7 +47,7 @@ def get_engine():
         kwargs: dict = {"pool_pre_ping": True}
         if settings.database_url.startswith("sqlite"):
             ensure_sqlite_parent_dir(settings.database_url)
-            kwargs["connect_args"] = {"check_same_thread": False}
+            kwargs["connect_args"] = {"check_same_thread": False, "timeout": 30}
         _engine = create_engine(settings.database_url, **kwargs)
         _SessionLocal = sessionmaker(bind=_engine, autocommit=False, autoflush=False)
     return _engine

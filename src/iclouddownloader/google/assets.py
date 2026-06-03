@@ -108,6 +108,7 @@ def index_google_library_to_db(
     user: User,
     *,
     commit_every: int = 200,
+    progress_every: int = 10,
     on_progress: Callable[[dict[str, int]], None] | None = None,
 ) -> dict[str, int]:
     client = GooglePhotosClient.for_user(user)
@@ -116,6 +117,12 @@ def index_google_library_to_db(
     pending_commit = 0
     page_token = cursor.cursor_value or None
 
+    def _maybe_report_progress() -> None:
+        if not on_progress:
+            return
+        if stats["indexed"] == 1 or stats["indexed"] % progress_every == 0:
+            on_progress(dict(stats))
+
     while True:
         data = client.list_media_items(page_size=100, page_token=page_token)
         for item in data.get("mediaItems") or []:
@@ -123,11 +130,10 @@ def index_google_library_to_db(
             stats["indexed"] += 1
             stats[action] += 1
             pending_commit += 1
+            _maybe_report_progress()
             if pending_commit >= commit_every:
                 db.commit()
                 pending_commit = 0
-                if on_progress:
-                    on_progress(dict(stats))
 
         page_token = data.get("nextPageToken")
         cursor.cursor_value = page_token

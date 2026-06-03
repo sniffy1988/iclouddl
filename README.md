@@ -72,9 +72,10 @@ This starts:
 
 | Service | Role |
 |---------|------|
+| `redis` | Pub/sub for live UI events + RQ job queues (`sync`, `count`) |
 | `migrate` | Runs `alembic upgrade head` once, then exits |
-| `api` | Web UI + REST API on port **8765** (configurable via `WEB_PORT`) |
-| `worker` | Sync scheduler + Telegram bot |
+| `api` | Web UI + REST API + WebSocket `/api/ws` on port **8765** (`WEB_PORT`) |
+| `worker` | RQ worker (sync/count jobs) + sync scheduler + Telegram bot |
 | `db-viewer` | SQLite/Postgres browser on **8766** (localhost only; optional profile) |
 
 No separate database server — SQLite file lives in **`./data/`** on your machine.
@@ -99,7 +100,7 @@ make start          # Same as ./start.sh (default make target)
 make build          # Build image only
 make up             # Start without rebuild
 make down           # Stop stack
-make logs           # Follow api + worker logs
+make logs           # Follow redis + api + worker logs
 make migrate        # Re-run migrations manually
 make shell-api      # Shell inside api container
 
@@ -158,9 +159,18 @@ Default in [`.env.docker.example`](.env.docker.example):
 
 ```
 DATABASE_URL=sqlite:////data/iclouddownloader.db
+REDIS_URL=redis://redis:6379/0
 ```
 
+**Redis is required** for background sync/count jobs and live dashboard updates (WebSocket `/api/ws`). Docker `./start.sh` starts Redis automatically; for local dev use `./scripts/start-local.sh` or run Redis yourself (`REDIS_URL` in `.env`, default `redis://127.0.0.1:6379/0`).
+
 ## Local development
+
+```bash
+./scripts/start-local.sh
+```
+
+Or manually:
 
 ```bash
 python -m venv .venv
@@ -168,6 +178,8 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 
 cp .env.example .env
+# Redis (auto-started by start-local.sh when possible, or):
+./scripts/redis-dev.sh start
 mkdir -p data/downloads data/cookies
 
 iclouddownloader db-upgrade
@@ -176,9 +188,11 @@ iclouddownloader db-upgrade
 cd web && npm install && npm run build && cd ..
 iclouddownloader web start
 
-# Terminal 2 — Worker daemon
+# Terminal 2 — Worker (RQ + scheduler)
 iclouddownloader daemon start
 ```
+
+`/api/health` includes a Redis ping (`redis: true` when reachable).
 
 Web dev with hot reload:
 

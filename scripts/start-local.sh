@@ -31,6 +31,15 @@ fi
 
 mkdir -p data/downloads data/cookies
 
+"$ROOT/scripts/redis-dev.sh" ensure
+
+REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379/0}"
+if [ -f .env ]; then
+  val="$(grep -E '^REDIS_URL=' .env 2>/dev/null | cut -d= -f2- | tr -d ' \r' || true)"
+  [ -n "$val" ] && REDIS_URL="$val"
+fi
+export REDIS_URL
+
 echo "Applying database migrations (alembic upgrade head)..."
 iclouddownloader db-upgrade
 
@@ -62,8 +71,9 @@ if [ -f .env ]; then
 fi
 
 echo ""
-echo "Starting worker (background) and web API (foreground)..."
-echo "  Web UI:  http://localhost:${WEB_PORT}"
+echo "Starting worker (RQ + scheduler) and web API (foreground)..."
+echo "  Redis:   ${REDIS_URL}"
+echo "  Web UI:  http://localhost:${WEB_PORT} (live updates via /api/ws)"
 echo "  Login:   create admin on first visit (stored in database)"
 echo "  Data:    ./data/iclouddownloader.db"
 echo "           ./data/downloads/<user>/icloud/ and .../google_photo/"

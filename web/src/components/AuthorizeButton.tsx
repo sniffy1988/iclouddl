@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { useToast } from "./ToastProvider";
+import { useRealtimeRefetchInterval } from "../hooks/useRealtime";
 
 type Props = {
   userId: number;
@@ -32,11 +33,13 @@ export default function AuthorizeButton({
   const [code, setCode] = useState("");
   const [deliveryHint, setDeliveryHint] = useState<string | null>(null);
 
+  const challengePoll = useRealtimeRefetchInterval(icloudPendingChallenge);
   const { data: challenge } = useQuery({
     queryKey: ["challenge", userId],
     queryFn: () => api.getPendingChallenge(userId),
     enabled: !!appleId,
-    refetchInterval: 5000,
+    refetchInterval:
+      challengePoll === false ? false : (challengePoll === 60000 ? 5000 : challengePoll),
   });
 
   const awaiting2fa = icloudPendingChallenge || !!challenge;

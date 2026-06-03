@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, PhotoSource } from "../api/client";
+import { patchCountStarted } from "../realtime/patchCount";
 import { useToast } from "./ToastProvider";
 
 type Props = {
@@ -25,9 +26,9 @@ export default function FetchCountButton({
   const fetchCount = useMutation({
     mutationFn: () => api.fetchPhotoCount(userId, source),
     onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: ["user", userId] });
-      qc.invalidateQueries({ queryKey: ["users"] });
-      qc.invalidateQueries({ queryKey: ["photo-counts", userId] });
+      if (result.ok && !result.already_running) {
+        patchCountStarted(qc, userId, source);
+      }
       if (result.already_running) {
         toast.warning(result.message || t("buttons.alreadyInProgress"));
       } else if (result.ok) {

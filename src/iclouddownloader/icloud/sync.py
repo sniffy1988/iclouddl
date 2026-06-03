@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import shutil
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,15 +27,27 @@ from iclouddownloader.icloud.library import list_library_photos
 from iclouddownloader.icloud.media import (
     LIVE_VIDEO_PREFIX,
     classify_media_type,
+    download_asset_to_file,
     download_by_prefix,
-    download_version,
     has_live_video_component,
+    is_stale_download_url_error,
     live_video_filename,
     master_fields,
 )
 from iclouddownloader.paths import provider_download_dir
 from iclouddownloader.providers.base import ProviderSyncResult, account_label, apply_provider_result_to_run
 from iclouddownloader.providers.cancel import drain_futures_with_cancel, is_sync_cancel_requested
+from iclouddownloader.providers.local_files import (
+    mark_photo_missing_on_disk,
+    photo_files_on_disk,
+    reconcile_stale_downloads,
+    try_adopt_existing_on_disk,
+    verify_written_file,
+)
+from iclouddownloader.providers.sync_progress import (
+    publish_sync_progress,
+    should_report_sync_progress,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +81,6 @@ def _write_response(response: Any, dest: Path) -> None:
             f.write(response)
 
 
-def _download_asset(photo: Any, dest: Path, version: str = "original") -> None:
-    response = download_version(photo, version)
-    _write_response(response, dest)
-
-
 def _download_live_companion(api_photo: Any, base_dir: Path, primary_filename: str) -> Path | None:
     if not has_live_video_component(api_photo):
         return None
@@ -89,6 +97,41 @@ class PhotoSyncEngine:
         self.notifier = notifier
         self.settings = get_settings()
         self.max_workers = max_workers
+
+    @staticmethod
+    def _merge_counter_delta(counters: dict[str, int], delta: dict[str, int] | None) -> None:
+        if not delta:
+            counters["failed"] += 1
+            return
+        for key in ("downloaded", "failed", "skipped"):
+            counters[key] += int(delta.get(key, 0))
+
+    @staticmethod
+    def process_photo_in_worker(
+        user_id: int,
+        api_photo: Any,
+        base_dir: Path,
+    ) -> dict[str, int]:
+        """Download one asset using a dedicated DB session (thread-safe)."""
+        from iclouddownloader.db.session import get_session_factory
+
+        db = get_session_factory()()
+        delta = {"downloaded": 0, "failed": 0, "skipped": 0}
+        try:
+            user = db.get(User, user_id)
+            if not user:
+                delta["failed"] += 1
+                return delta
+            PhotoSyncEngine(db)._process_photo(user, api_photo, base_dir, delta)
+            db.commit()
+            return delta
+        except Exception:
+            db.rollback()
+            delta["failed"] += 1
+            logger.exception("iCloud download worker failed for user %s", user_id)
+            return delta
+        finally:
+            db.close()
 
     def _get_or_create_cursor(self, user: User) -> SyncCursor:
         cursor = self.db.scalar(
@@ -164,12 +207,10 @@ class PhotoSyncEngine:
     ) -> bool:
         if record.status != PhotoStatus.downloaded:
             return False
-        if not record.local_path or not Path(record.local_path).exists():
-            return False
-        if require_live_companion and has_live_video_component(api_photo):
-            if not record.companion_local_path or not Path(record.companion_local_path).exists():
-                return False
-        return True
+        if photo_files_on_disk(record, require_companion=require_live_companion):
+            return True
+        mark_photo_missing_on_disk(record)
+        return False
 
     def _process_photo(
         self,
@@ -210,6 +251,11 @@ class PhotoSyncEngine:
             return "skipped"
 
         dest = _local_path(base_dir, api_photo, filename)
+        companion_dest = None
+        if require_live:
+            companion_dest = _local_path(
+                base_dir, api_photo, live_video_filename(filename, master_fields(api_photo))
+            )
         version = effective.icloud_download_version if effective.icloud_download_version in (
             "original",
             "medium",
@@ -229,17 +275,31 @@ class PhotoSyncEngine:
         if not existing:
             self.db.add(record)
 
+        if try_adopt_existing_on_disk(
+            record,
+            dest,
+            companion=companion_dest,
+            require_companion=require_live,
+            companion_media_type="live_video" if require_live else None,
+            checksum_fn=_sha256,
+        ):
+            counters["skipped"] += 1
+            return "skipped"
+
         try:
-            _download_asset(api_photo, dest, version=version)
+            download_asset_to_file(api_photo, dest, version=version)
+            verify_written_file(dest)
             checksum = _sha256(dest)
-            record.local_path = str(dest)
+            record.local_path = str(dest.resolve())
             record.file_size = dest.stat().st_size
             record.checksum_sha256 = checksum
-            companion_dest = None
             if require_live:
                 companion_dest = _download_live_companion(api_photo, base_dir, filename)
+            else:
+                companion_dest = None
             if companion_dest:
-                record.companion_local_path = str(companion_dest)
+                verify_written_file(companion_dest)
+                record.companion_local_path = str(companion_dest.resolve())
                 record.companion_media_type = "live_video"
                 record.companion_file_size = companion_dest.stat().st_size
                 record.companion_checksum_sha256 = _sha256(companion_dest)
@@ -259,7 +319,15 @@ class PhotoSyncEngine:
             record.status = PhotoStatus.failed
             record.error_message = str(e)
             counters["failed"] += 1
-            logger.exception("Failed to download %s for user %s", asset_id, account_label(user))
+            if is_stale_download_url_error(e):
+                logger.warning(
+                    "iCloud download URL expired for %s (user %s): %s",
+                    asset_id,
+                    account_label(user),
+                    e,
+                )
+            else:
+                logger.exception("Failed to download %s for user %s", asset_id, account_label(user))
             return "failed"
 
     def _iter_photos(self, api) -> list[Any]:
@@ -289,38 +357,106 @@ class PhotoSyncEngine:
             api_ids = {_asset_id(p) for p in photos}
             counters["discovered"] = len(photos)
 
+            reconcile_stale_downloads(self.db, user.id, source=PhotoSource.icloud)
+
             for stale in self._pending_photos(user.id):
                 if stale.provider_asset_id not in api_ids:
                     stale.status = PhotoStatus.skipped
                     stale.error_message = "Asset no longer in iCloud library"
 
-            workers = self.max_workers or get_effective_settings().max_concurrent_downloads
-            with ThreadPoolExecutor(max_workers=workers) as pool:
-                futures = {
-                    pool.submit(self._process_photo, user, p, base_dir, counters): p for p in photos
-                }
-                progress = {"done": 0}
+            from iclouddownloader.config import get_settings
+            from iclouddownloader.db.session import sqlite_file_path
 
-                def on_progress() -> None:
-                    progress["done"] += 1
-                    if progress["done"] % 10 == 0:
-                        self.db.commit()
-
-                stopped = drain_futures_with_cancel(
-                    self.db, sync_run_id, futures, on_progress=on_progress
+            use_sequential = bool(sqlite_file_path(get_settings().database_url))
+            if use_sequential:
+                logger.info(
+                    "Sequential iCloud downloads for user %s (%s assets; SQLite-safe)",
+                    user.id,
+                    len(photos),
                 )
+                for i, photo in enumerate(photos):
+                    if is_sync_cancel_requested(self.db, sync_run_id):
+                        self.db.commit()
+                        return ProviderSyncResult(
+                            source=PhotoSource.icloud,
+                            photos_discovered=counters["discovered"],
+                            photos_downloaded=counters["downloaded"],
+                            photos_failed=counters["failed"],
+                            photos_skipped=counters["skipped"],
+                            success=False,
+                            cancelled=True,
+                            error="cancelled",
+                        )
+                    self._process_photo(user, photo, base_dir, counters)
+                    done = i + 1
+                    if should_report_sync_progress(done):
+                        self.db.commit()
+                        publish_sync_progress(
+                            self.db,
+                            user,
+                            sync_run_id,
+                            counters,
+                            source=PhotoSource.icloud,
+                        )
                 self.db.commit()
-                if stopped:
-                    return ProviderSyncResult(
-                        source=PhotoSource.icloud,
-                        photos_discovered=counters["discovered"],
-                        photos_downloaded=counters["downloaded"],
-                        photos_failed=counters["failed"],
-                        photos_skipped=counters["skipped"],
-                        success=False,
-                        cancelled=True,
-                        error="cancelled",
+            else:
+                workers = self.max_workers or get_effective_settings().max_concurrent_downloads
+                counter_lock = threading.Lock()
+
+                def merge_delta(delta: dict[str, int] | None, *, error: Exception | None = None) -> None:
+                    with counter_lock:
+                        if error is not None:
+                            counters["failed"] += 1
+                        else:
+                            PhotoSyncEngine._merge_counter_delta(counters, delta)
+
+                with ThreadPoolExecutor(max_workers=workers) as pool:
+                    futures = {
+                        pool.submit(
+                            PhotoSyncEngine.process_photo_in_worker,
+                            user.id,
+                            p,
+                            base_dir,
+                        ): p
+                        for p in photos
+                    }
+                    progress = {"done": 0}
+
+                    def on_progress() -> None:
+                        progress["done"] += 1
+                        done = progress["done"]
+                        if should_report_sync_progress(done):
+                            with counter_lock:
+                                snap = dict(counters)
+                            publish_sync_progress(
+                                self.db,
+                                user,
+                                sync_run_id,
+                                snap,
+                                source=PhotoSource.icloud,
+                            )
+
+                    stopped = drain_futures_with_cancel(
+                        self.db,
+                        sync_run_id,
+                        futures,
+                        on_progress=on_progress,
+                        on_future_done=lambda result, error=None: merge_delta(
+                            result if error is None else None, error=error
+                        ),
                     )
+                    self.db.commit()
+                    if stopped:
+                        return ProviderSyncResult(
+                            source=PhotoSource.icloud,
+                            photos_discovered=counters["discovered"],
+                            photos_downloaded=counters["downloaded"],
+                            photos_failed=counters["failed"],
+                            photos_skipped=counters["skipped"],
+                            success=False,
+                            cancelled=True,
+                            error="cancelled",
+                        )
 
             cursor = self._get_or_create_cursor(user)
             cursor.cursor_value = f"synced_{datetime.now(timezone.utc).isoformat()}"
