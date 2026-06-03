@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="iCloud DL">
+  <rect width="180" height="180" rx="40" fill="#0f172a"/>
+  <path
+    fill="#38bdf8"
+    d="M119.3 81.6a23.6 23.6 0 0 0-45-6.2A25.9 25.9 0 0 0 36.6 100.2c0 15.2 12.4 26.6 27.6 26.6h56.8a17.9 17.9 0 1 0 1.1-35.8 23.6 23.6 0 0 0-2.8-9Z"
+  />
+  <path
+    fill="none"
+    stroke="#7dd3fc"
+    stroke-width="11"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    d="M90 112.5v22.5m0 0-15.8-15.8M90 135l15.8-15.8"
+  />
+</svg>

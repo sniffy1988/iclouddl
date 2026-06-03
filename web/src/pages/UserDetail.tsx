@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api } from "../api/client";
 import { useToast } from "../components/ToastProvider";
 import AuthorizeButton from "../components/AuthorizeButton";
+import DisconnectIcloudButton from "../components/DisconnectIcloudButton";
 import { format2faDaysLeft } from "../utils/format2fa";
 import { formatDateTime } from "../utils/formatDateTime";
 import StatusPill from "../components/StatusPill";
@@ -22,7 +23,12 @@ import {
   secondsToHours,
   syncIntervalPresetLabel,
 } from "../utils/syncSchedule";
-import { canCountIcloud, canSyncIcloud, hasSavedAppleId } from "../utils/icloudActions";
+import {
+  canCountIcloud,
+  canDisconnectIcloud,
+  canSyncIcloud,
+  hasSavedAppleId,
+} from "../utils/icloudActions";
 import { googleSectionDescription, icloudSectionDescription } from "../utils/providerStatus";
 
 function Section({
@@ -339,6 +345,12 @@ export default function UserDetail() {
                     })}
                   </span>
                 )}
+                {canDisconnectIcloud(user) && (
+                  <DisconnectIcloudButton
+                    userId={userId}
+                    disabled={icloudSyncActive || isCountingIcloud}
+                  />
+                )}
               </>
             )}
           </div>
@@ -358,7 +370,9 @@ export default function UserDetail() {
               title={
                 !icloudCountOk && !hasSavedAppleId(user)
                   ? t("userDetail.saveAppleIdFirst")
-                  : undefined
+                  : !icloudCountOk && user.icloud_auth_status !== "authorized"
+                    ? t("userDetail.signInIcloudFirst")
+                    : undefined
               }
             />
             <SyncNowButton
@@ -366,9 +380,11 @@ export default function UserDetail() {
               source="icloud"
               disabled={!icloudSyncOk}
               title={
-                !icloudSyncOk && icloudCountOk
+                !icloudSyncOk && hasSavedAppleId(user) && user.icloud_auth_status !== "authorized"
                   ? t("userDetail.signInIcloudFirst")
-                  : undefined
+                  : !icloudSyncOk && !hasSavedAppleId(user)
+                    ? t("userDetail.saveAppleIdFirst")
+                    : undefined
               }
             />
             {icloudSyncActive && (

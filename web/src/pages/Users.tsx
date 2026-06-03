@@ -9,12 +9,46 @@ import StatusPill from "../components/StatusPill";
 import { formatSyncInterval } from "../utils/syncSchedule";
 import { useToast } from "../components/ToastProvider";
 
+function libraryTotal(user: User): number | null {
+  const icloud = user.icloud_photos_count;
+  const google = user.google_photos_count;
+  if (icloud == null && google == null) return null;
+  return (icloud ?? 0) + (google ?? 0);
+}
+
+function isIndexingProvider(user: User, provider: "icloud" | "google") {
+  if (user.activity_status === "counting") return true;
+  return user.activity_status === (provider === "icloud" ? "counting_icloud" : "counting_google");
+}
+
+function LibraryCountCell({
+  count,
+  indexing,
+  indexingTitle,
+}: {
+  count: number | null | undefined;
+  indexing: boolean;
+  indexingTitle: string;
+}) {
+  const { t } = useTranslation();
+  if (indexing) {
+    return (
+      <span className="text-sky-400" title={indexingTitle}>
+        {(count ?? 0).toLocaleString()}
+      </span>
+    );
+  }
+  return count != null ? count.toLocaleString() : t("common.dash");
+}
+
 export default function Users() {
   const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const hasCounting = (users: User[] | undefined) =>
-    users?.some((u) => u.activity_status === "counting") ?? false;
+    users?.some((u) =>
+      ["counting", "counting_icloud", "counting_google"].includes(u.activity_status)
+    ) ?? false;
   const { data: users, isLoading } = useQuery({
     queryKey: ["users"],
     queryFn: api.users,
@@ -24,7 +58,7 @@ export default function Users() {
   const [showAdd, setShowAdd] = useState(false);
   const [appleId, setAppleId] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [fetchOnCreate, setFetchOnCreate] = useState(true);
+  const [fetchOnCreate, setFetchOnCreate] = useState(false);
 
   const create = useMutation({
     mutationFn: () =>
@@ -121,7 +155,7 @@ export default function Users() {
       )}
 
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[900px]">
+        <table className="w-full text-sm min-w-[1100px]">
           <thead>
             <tr className="text-slate-500 border-b border-slate-800">
               <th className="text-left py-2 pr-4">{t("users.colUser")}</th>
@@ -129,6 +163,8 @@ export default function Users() {
               <th className="text-left py-2 pr-4">{t("users.colActivity")}</th>
               <th className="text-left py-2 pr-4">{t("users.col2fa")}</th>
               <th className="text-right py-2 pr-4">{t("users.colIcloudPhotos")}</th>
+              <th className="text-right py-2 pr-4">{t("users.colGooglePhotos")}</th>
+              <th className="text-right py-2 pr-4">{t("users.colTotalPhotos")}</th>
               <th className="text-right py-2 pr-4">{t("users.colDownloaded")}</th>
               <th className="text-right py-2 pr-4">{t("users.colRemaining")}</th>
               <th className="text-left py-2 pr-4">{t("users.colSchedule")}</th>
@@ -161,19 +197,42 @@ export default function Users() {
                   {format2faDaysLeft(u.days_until_2fa_expires)}
                 </td>
                 <td className="py-3 pr-4 text-right tabular-nums">
-                  {u.activity_status === "counting" ? (
-                    <span className="text-sky-400" title={t("users.indexingTitle")}>
-                      {(u.icloud_photos_count ?? 0).toLocaleString()}
+                  <LibraryCountCell
+                    count={u.icloud_photos_count}
+                    indexing={isIndexingProvider(u, "icloud")}
+                    indexingTitle={t("users.indexingIcloudTitle")}
+                  />
+                </td>
+                <td className="py-3 pr-4 text-right tabular-nums">
+                  <LibraryCountCell
+                    count={u.google_photos_count}
+                    indexing={isIndexingProvider(u, "google")}
+                    indexingTitle={t("users.indexingGoogleTitle")}
+                  />
+                </td>
+                <td className="py-3 pr-4 text-right tabular-nums text-slate-200">
+                  {["counting", "counting_icloud", "counting_google"].includes(
+                    u.activity_status
+                  ) ? (
+                    <span
+                      className="text-sky-400"
+                      title={t("users.indexingTotalTitle")}
+                    >
+                      {(libraryTotal(u) ?? 0).toLocaleString()}
                     </span>
+                  ) : libraryTotal(u) != null ? (
+                    libraryTotal(u)!.toLocaleString()
                   ) : (
-                    (u.icloud_photos_count?.toLocaleString() ?? t("common.dash"))
+                    t("common.dash")
                   )}
                 </td>
                 <td className="py-3 pr-4 text-right tabular-nums text-slate-300">
                   {u.downloaded_count?.toLocaleString() ?? 0}
                 </td>
                 <td className="py-3 pr-4 text-right tabular-nums text-slate-400">
-                  {u.activity_status === "counting" ? (
+                  {["counting", "counting_icloud", "counting_google"].includes(
+                    u.activity_status
+                  ) ? (
                     <span className="text-slate-500" title={t("users.remainingAfterIndex")}>
                       …
                     </span>

@@ -223,7 +223,7 @@ export const api = {
   getUser: (id: number) => request<User>(`/users/${id}`),
   createUser: (
     data: { apple_id?: string | null; display_name?: string; download_dir?: string },
-    fetchCount = true
+    fetchCount = false
   ) =>
     request<User>(`/users?fetch_count=${fetchCount}`, {
       method: "POST",
@@ -256,6 +256,8 @@ export const api = {
     request<{ authorize_url: string }>(`/users/${id}/auth/google/start`, { method: "POST" }),
   disconnectGoogle: (id: number) =>
     request<{ ok: boolean }>(`/users/${id}/auth/google/disconnect`, { method: "POST" }),
+  disconnectIcloud: (id: number) =>
+    request<{ ok: boolean }>(`/users/${id}/auth/icloud/disconnect`, { method: "POST" }),
   triggerDueSyncs: () =>
     request<TriggerDueResult>("/sync/trigger-due", { method: "POST" }),
   startICloudAuth: (id: number, password: string) =>

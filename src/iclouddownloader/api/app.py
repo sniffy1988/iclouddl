@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from iclouddownloader.api.routes import auth, google_auth, logs, photos, settings, sync, users
+from iclouddownloader.api.web_static import safe_dist_file
 from iclouddownloader.logging_setup import (
     configure_logging,
     get_logging_level,
@@ -77,6 +78,9 @@ def create_app() -> FastAPI:
                 from fastapi import HTTPException
 
                 raise HTTPException(404)
+            static = safe_dist_file(web_dist, full_path) if full_path else None
+            if static is not None:
+                return FileResponse(static)
             index = web_dist / "index.html"
             if index.exists():
                 return FileResponse(index)

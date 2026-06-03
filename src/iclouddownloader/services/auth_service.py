@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 from datetime import datetime, timedelta, timezone
 
 from pyicloud.exceptions import (
@@ -18,6 +19,7 @@ from iclouddownloader.db.models import (
 )
 from iclouddownloader.events import SyncEvent, get_event_bus
 from iclouddownloader.icloud.auth import AuthRequired, get_pyicloud_service, submit_2fa_code, submit_2sa_code
+from iclouddownloader.config import get_settings
 from iclouddownloader.config import get_settings
 from iclouddownloader.icloud.client import cookie_dir_for_user
 
@@ -128,6 +130,45 @@ class AuthService:
     def handle_background_auth_required(self, user: User) -> None:
         """Scheduled sync/count failed auth — do not create new 2FA challenges."""
         self.mark_needs_auth(user)
+        if user.last_sync_status in (
+            "counting",
+            "counting_icloud",
+            "counting_google",
+            "queued",
+            "syncing",
+        ):
+            user.last_sync_status = "idle"
+        self.db.commit()
+
+    def disconnect_icloud(self, user: User) -> None:
+        """Clear iCloud session, cookies, and pending 2FA challenges. Keeps Apple ID and photo index."""
+        if not user.apple_id:
+            raise ValueError("iCloud is not linked for this user")
+
+        for challenge in self.db.scalars(
+            select(AuthChallenge).where(
+                AuthChallenge.user_id == user.id,
+                AuthChallenge.status == AuthChallengeStatus.pending,
+            )
+        ).all():
+            challenge.status = AuthChallengeStatus.expired
+
+        user.icloud_authenticated_at = None
+        user.icloud_2fa_at = None
+        user.icloud_session_ok_at = None
+        user.icloud_needs_auth = True
+        if user.last_sync_status in (
+            "counting",
+            "counting_icloud",
+            "queued",
+            "syncing",
+        ):
+            user.last_sync_status = "idle"
+
+        cookie_dir = get_settings().cookie_dir / str(user.id)
+        if cookie_dir.is_dir():
+            shutil.rmtree(cookie_dir, ignore_errors=True)
+
         self.db.commit()
 
     def create_challenge(

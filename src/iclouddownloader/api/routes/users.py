@@ -39,7 +39,7 @@ def list_users(db: Session = Depends(get_db), _: None = Depends(require_auth)):
 def create_user(
     body: UserCreate,
     background_tasks: BackgroundTasks,
-    fetch_count: bool = True,
+    fetch_count: bool = False,
     db: Session = Depends(get_db),
     _: None = Depends(require_auth),
 ):
@@ -52,7 +52,7 @@ def create_user(
     notifier = AppNotifier()
     notifier.user_added(user)
 
-    if fetch_count:
+    if fetch_count and user.apple_id and AuthService(db).is_authorized(user):
 
         def _count(uid: int):
             from iclouddownloader.db.session import get_session_factory
@@ -61,7 +61,14 @@ def create_user(
             try:
                 SyncService(sdb, notifier=notifier).fetch_icloud_photo_count(uid)
             except Exception:
-                pass
+                u = UserService(sdb).get_user(uid)
+                if u and u.last_sync_status in (
+                    "counting",
+                    "counting_icloud",
+                    "counting_google",
+                ):
+                    u.last_sync_status = "idle"
+                    sdb.commit()
             finally:
                 sdb.close()
 
@@ -81,8 +88,11 @@ def fetch_all_photo_counts(
     user_svc = UserService(db)
     queued: list[int] = []
 
+    auth_svc = AuthService(db)
     for user in user_svc.list_users():
         if not user.enabled:
+            continue
+        if not user.apple_id or not auth_svc.is_authorized(user):
             continue
         if user.last_sync_status == "counting":
             continue
@@ -206,6 +216,9 @@ def fetch_photo_count(
             already_running=True,
         )
 
+    if photo_source == PhotoSource.icloud and not AuthService(db).is_authorized(user):
+        raise HTTPException(400, "Authorize iCloud before counting photos")
+
     try:
         sync_svc.ensure_can_start_sync(user_id, requested=photo_source)
     except SyncInProgressError as e:
@@ -301,6 +314,29 @@ def cancel_sync(
     except ValueError as e:
         raise HTTPException(404, str(e)) from e
     return CancelSyncResponse(**result)
+
+
+@router.post("/{user_id}/auth/icloud/disconnect")
+def disconnect_icloud(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_auth),
+):
+    user = UserService(db).get_user(user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    sync_svc = SyncService(db)
+    for run in sync_svc.get_active_sync_runs(user_id):
+        if run.scope.value in ("icloud", "all"):
+            raise HTTPException(
+                409,
+                "Cannot disconnect iCloud while an iCloud or full sync is running",
+            )
+    try:
+        AuthService(db).disconnect_icloud(user)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"ok": True}
 
 
 @router.post("/{user_id}/auth/login", response_model=UserICloudLoginResponse)

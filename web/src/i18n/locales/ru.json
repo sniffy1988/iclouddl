@@ -91,14 +91,19 @@
     "colAuth": "Авторизация",
     "colActivity": "Активность",
     "col2fa": "2FA осталось",
-    "colIcloudPhotos": "Фото iCloud",
+    "colIcloudPhotos": "iCloud",
+    "colGooglePhotos": "Google",
+    "colTotalPhotos": "Всего",
     "colDownloaded": "Скачано",
     "colRemaining": "Осталось",
     "colSchedule": "Расписание",
     "colLastSync": "Последняя синхр.",
     "colActions": "Действия",
     "manageUserTitle": "Управление пользователем",
-    "indexingTitle": "Индексация библиотеки iCloud в базу",
+    "indexingTitle": "Индексация библиотеки в базу",
+    "indexingIcloudTitle": "Индексация библиотеки iCloud в базу",
+    "indexingGoogleTitle": "Индексация Google Photos в базу",
+    "indexingTotalTitle": "Суммарный размер библиотеки во время индексации",
     "remainingAfterIndex": "Доступно после завершения индексации",
     "empty": "Пользователей пока нет. Добавьте Apple ID выше — можно подсчитать фото до синхронизации.",
     "userAdded": "Пользователь {{label}} добавлен"
@@ -202,6 +207,9 @@
     "completeSignIn": "Завершите вход во вкладке Google и вернитесь сюда",
     "disconnected": "Google Photos отключён",
     "connected": "Google Photos подключён"
+  },
+  "icloud": {
+    "disconnected": "iCloud отключён"
   },
   "userDetail": {
     "backToUsers": "← Пользователи",

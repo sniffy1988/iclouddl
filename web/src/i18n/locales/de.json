@@ -90,14 +90,19 @@
     "colAuth": "Auth",
     "colActivity": "Aktivität",
     "col2fa": "2FA übrig",
-    "colIcloudPhotos": "iCloud-Fotos",
+    "colIcloudPhotos": "iCloud",
+    "colGooglePhotos": "Google",
+    "colTotalPhotos": "Gesamt",
     "colDownloaded": "Heruntergeladen",
     "colRemaining": "Verbleibend",
     "colSchedule": "Zeitplan",
     "colLastSync": "Letzter Sync",
     "colActions": "Aktionen",
     "manageUserTitle": "Benutzer verwalten",
-    "indexingTitle": "iCloud-Bibliothek wird in die Datenbank indexiert",
+    "indexingTitle": "Bibliothek wird in die Datenbank indexiert",
+    "indexingIcloudTitle": "iCloud-Bibliothek wird in die Datenbank indexiert",
+    "indexingGoogleTitle": "Google Photos wird in die Datenbank indexiert",
+    "indexingTotalTitle": "Kombinierte Bibliotheksgröße während der Indexierung",
     "remainingAfterIndex": "Verfügbar nach Abschluss der Indexierung",
     "empty": "Noch keine Benutzer. Apple-ID oben hinzufügen — Fotoanzahl vor dem Sync möglich.",
     "userAdded": "Benutzer {{label}} hinzugefügt"
@@ -198,6 +203,9 @@
     "completeSignIn": "Anmeldung im Google-Tab abschließen, dann hierher zurück",
     "disconnected": "Google Photos getrennt",
     "connected": "Google Photos verbunden"
+  },
+  "icloud": {
+    "disconnected": "iCloud getrennt"
   },
   "userDetail": {
     "backToUsers": "← Benutzer",
