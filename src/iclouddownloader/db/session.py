@@ -2,7 +2,8 @@ from collections.abc import Generator
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from iclouddownloader.config import get_settings
@@ -29,6 +30,14 @@ def ensure_sqlite_parent_dir(database_url: str) -> None:
     db_path = sqlite_file_path(database_url)
     if db_path:
         db_path.parent.mkdir(parents=True, exist_ok=True)
+
+
+@event.listens_for(Engine, "connect")
+def _sqlite_enable_foreign_keys(dbapi_connection, _connection_record) -> None:
+    if dbapi_connection.__class__.__module__.startswith("sqlite3"):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 
 def get_engine():

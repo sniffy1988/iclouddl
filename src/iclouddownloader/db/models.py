@@ -93,10 +93,18 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
-    photos: Mapped[list[Photo]] = relationship(back_populates="user")
-    sync_runs: Mapped[list[SyncRun]] = relationship(back_populates="user")
-    sync_cursors: Mapped[list[SyncCursor]] = relationship(back_populates="user")
-    auth_challenges: Mapped[list[AuthChallenge]] = relationship(back_populates="user")
+    photos: Mapped[list[Photo]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", passive_deletes=True
+    )
+    sync_runs: Mapped[list[SyncRun]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", passive_deletes=True
+    )
+    sync_cursors: Mapped[list[SyncCursor]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", passive_deletes=True
+    )
+    auth_challenges: Mapped[list[AuthChallenge]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class SyncCursor(Base):
