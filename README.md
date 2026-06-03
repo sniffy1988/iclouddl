@@ -26,6 +26,8 @@ Backup targets your full **iCloud Photos** library (`All Photos`) and **Google P
 
 Not included: Recently Deleted, Hidden albums, iCloud Drive, or burst frames beyond what Apple/Google expose as a single library item.
 
+**Settings → Library backup policy** (optional): skip videos, Live Photo companions, or Motion Photo companions; iCloud quality original vs medium. Defaults download everything.
+
 **Immich:** per-user external library settings appear only when **Settings → Enable Immich library scans** is on.
 
 ## Apple account requirements

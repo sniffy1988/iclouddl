@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
@@ -11,6 +12,8 @@ from iclouddownloader.db.models import Photo, PhotoSource, PhotoStatus, SyncCurs
 from iclouddownloader.google.client import GooglePhotosClient
 
 GOOGLE_LIBRARY_KEY = "google_photos"
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_creation_time(item: dict[str, Any]) -> datetime | None:
@@ -136,4 +139,9 @@ def index_google_library_to_db(
 
     if on_progress:
         on_progress(dict(stats))
+    logger.info(
+        "Google Photos index complete for user %s: %s mediaItems (full library, no type filter)",
+        user.id,
+        stats["indexed"],
+    )
     return stats

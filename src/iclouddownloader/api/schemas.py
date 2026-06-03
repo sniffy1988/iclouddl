@@ -114,6 +114,10 @@ class PhotoResponse(BaseModel):
     checksum_sha256: str | None
     asset_date: datetime | None
     media_type: str | None
+    companion_local_path: str | None = None
+    companion_media_type: str | None = None
+    companion_file_size: int | None = None
+    companion_checksum_sha256: str | None = None
     status: str
     downloaded_at: datetime | None
     error_message: str | None
@@ -227,6 +231,10 @@ class SettingsResponse(BaseModel):
     token_encryption_key_set: bool = False
     debug_logging_enabled: bool = False
     logging_level: str = "OFF"
+    icloud_download_version: str = "original"
+    skip_videos: bool = False
+    skip_live_companions: bool = False
+    skip_motion_companions: bool = False
 
 
 class AppLogEntry(BaseModel):
@@ -264,3 +272,7 @@ class SettingsUpdate(BaseModel):
     google_oauth_client_secret: str | None = None
     debug_logging_enabled: bool | None = None
     logging_level: str | None = None
+    icloud_download_version: str | None = None
+    skip_videos: bool | None = None
+    skip_live_companions: bool | None = None
+    skip_motion_companions: bool | None = None

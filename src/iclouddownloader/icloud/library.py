@@ -30,4 +30,9 @@ def count_library_photos(api) -> int:
 
 
 def list_library_photos(api) -> list[Any]:
-    return list(iter_library_photos(api))
+    photos = list(iter_library_photos(api))
+    logger.info(
+        "iCloud library walk complete: %s assets from All Photos (no type filter)",
+        len(photos),
+    )
+    return photos

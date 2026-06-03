@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     immich_api_key: str = ""
     immich_scan_debounce_seconds: int = 120
 
+    icloud_download_version: str = "original"
+    skip_videos: bool = False
+    skip_live_companions: bool = False
+    skip_motion_companions: bool = False
+
 
 class EffectiveSettings(Settings):
     """Env settings merged with runtime_settings row (Telegram, Immich, sync defaults)."""

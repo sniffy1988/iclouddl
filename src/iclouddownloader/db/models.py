@@ -230,6 +230,10 @@ class RuntimeSettings(Base):
     google_oauth_client_secret: Mapped[str] = mapped_column(String(512), default="")
     debug_logging_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     logging_level: Mapped[str] = mapped_column(String(16), default="OFF")
+    icloud_download_version: Mapped[str] = mapped_column(String(16), default="original")
+    skip_videos: Mapped[bool] = mapped_column(Boolean, default=False)
+    skip_live_companions: Mapped[bool] = mapped_column(Boolean, default=False)
+    skip_motion_companions: Mapped[bool] = mapped_column(Boolean, default=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 

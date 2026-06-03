@@ -106,10 +106,19 @@ class GooglePhotoSyncEngine:
             record.error_message = "Media item not found in Google library"
             return "failed"
 
+        effective = get_effective_settings()
         motion = is_motion_photo(item)
+        require_motion = motion and not effective.skip_motion_companions
+
+        if effective.skip_videos and record.media_type == "video":
+            record.status = PhotoStatus.skipped
+            record.error_message = "Skipped by settings (videos disabled)"
+            counters["skipped"] += 1
+            return "skipped"
+
         if record.status == PhotoStatus.downloaded:
             if record.local_path and Path(record.local_path).exists():
-                if not motion or (
+                if not require_motion or (
                     record.companion_local_path
                     and Path(record.companion_local_path).exists()
                 ):
@@ -140,7 +149,7 @@ class GooglePhotoSyncEngine:
             record.local_path = str(dest)
             record.file_size = dest.stat().st_size
             record.checksum_sha256 = _sha256(dest)
-            if motion:
+            if require_motion:
                 companion_name = _motion_companion_filename(record.filename)
                 companion_dest = _local_path(base_dir, dt, companion_name)
                 video_data = client.download_bytes(base_url, variant="dv")
@@ -150,6 +159,11 @@ class GooglePhotoSyncEngine:
                 record.companion_media_type = "motion_video"
                 record.companion_file_size = companion_dest.stat().st_size
                 record.companion_checksum_sha256 = _sha256(companion_dest)
+            elif motion and effective.skip_motion_companions:
+                record.companion_local_path = None
+                record.companion_media_type = None
+                record.companion_file_size = None
+                record.companion_checksum_sha256 = None
             else:
                 record.companion_local_path = None
                 record.companion_media_type = None
@@ -177,6 +191,11 @@ class GooglePhotoSyncEngine:
             page_token = data.get("nextPageToken")
             if not page_token:
                 break
+        logger.info(
+            "Google library cache built for user %s: %s mediaItems",
+            user.id,
+            len(cache),
+        )
         return cache
 
     def execute_sync(self, user: User, sync_run_id: int | None = None) -> ProviderSyncResult:

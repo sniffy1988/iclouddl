@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
@@ -9,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from iclouddownloader.db.models import Photo, PhotoSource, PhotoStatus, User
 from iclouddownloader.icloud.library import iter_library_photos
+
+logger = logging.getLogger(__name__)
 
 
 def asset_id(photo: Any) -> str:
@@ -110,4 +113,9 @@ def index_library_to_db(
     db.commit()
     if on_progress:
         on_progress(dict(stats))
+    logger.info(
+        "iCloud index complete for user %s: %s assets (full All Photos library)",
+        user.id,
+        stats["indexed"],
+    )
     return stats

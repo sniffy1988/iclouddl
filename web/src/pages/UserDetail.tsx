@@ -399,6 +399,7 @@ export default function UserDetail() {
             />
           </div>
           <FieldHelp className="mb-3">{t("userDetail.googleConnectHelp")}</FieldHelp>
+          <FieldHelp className="mb-3">{t("userDetail.googleCountSyncHelp")}</FieldHelp>
           <div className="flex flex-wrap gap-2">
             <FetchCountButton
               userId={userId}

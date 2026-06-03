@@ -62,6 +62,10 @@ class RuntimeSettingsService:
             immich_base_url=env.immich_base_url,
             immich_api_key=env.immich_api_key,
             immich_scan_debounce_seconds=env.immich_scan_debounce_seconds,
+            icloud_download_version=env.icloud_download_version,
+            skip_videos=env.skip_videos,
+            skip_live_companions=env.skip_live_companions,
+            skip_motion_companions=env.skip_motion_companions,
             google_oauth_client_id=os.getenv("GOOGLE_OAUTH_CLIENT_ID", "").strip(),
             google_oauth_client_secret=os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "").strip(),
         )
@@ -118,6 +122,10 @@ class RuntimeSettingsService:
             "token_encryption_key_set": bool(env.token_encryption_key.strip()),
             "debug_logging_enabled": row.debug_logging_enabled,
             "logging_level": normalize_log_level(row.logging_level),
+            "icloud_download_version": row.icloud_download_version or "original",
+            "skip_videos": row.skip_videos,
+            "skip_live_companions": row.skip_live_companions,
+            "skip_motion_companions": row.skip_motion_companions,
         }
 
     def update(self, data: dict) -> RuntimeSettings:
@@ -164,6 +172,17 @@ class RuntimeSettingsService:
         elif "debug_logging_enabled" in data and data["debug_logging_enabled"] is not None:
             row.debug_logging_enabled = bool(data["debug_logging_enabled"])
             row.logging_level = "DEBUG" if row.debug_logging_enabled else "OFF"
+        if "icloud_download_version" in data and data["icloud_download_version"] is not None:
+            version = str(data["icloud_download_version"]).strip().lower()
+            if version not in ("original", "medium"):
+                raise ValueError("icloud_download_version must be 'original' or 'medium'")
+            row.icloud_download_version = version
+        if "skip_videos" in data and data["skip_videos"] is not None:
+            row.skip_videos = bool(data["skip_videos"])
+        if "skip_live_companions" in data and data["skip_live_companions"] is not None:
+            row.skip_live_companions = bool(data["skip_live_companions"])
+        if "skip_motion_companions" in data and data["skip_motion_companions"] is not None:
+            row.skip_motion_companions = bool(data["skip_motion_companions"])
 
         self.db.commit()
         self.db.refresh(row)
@@ -197,6 +216,10 @@ def get_effective_settings_from_row(row: RuntimeSettings | None) -> EffectiveSet
             "google_oauth_client_secret": row.google_oauth_client_secret,
             "debug_logging_enabled": row.debug_logging_enabled,
             "logging_level": normalize_log_level(row.logging_level),
+            "icloud_download_version": row.icloud_download_version or "original",
+            "skip_videos": row.skip_videos,
+            "skip_live_companions": row.skip_live_companions,
+            "skip_motion_companions": row.skip_motion_companions,
         }
     )
     return EffectiveSettings(**merged)

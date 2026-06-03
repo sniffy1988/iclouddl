@@ -173,6 +173,10 @@ export interface SettingsData {
   token_encryption_key_set?: boolean;
   debug_logging_enabled?: boolean;
   logging_level?: string;
+  icloud_download_version?: string;
+  skip_videos?: boolean;
+  skip_live_companions?: boolean;
+  skip_motion_companions?: boolean;
 }
 
 export interface AppLogEntry {

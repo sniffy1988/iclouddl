@@ -41,6 +41,10 @@ export default function Settings() {
         logging_level:
           settings.logging_level ??
           (settings.debug_logging_enabled ? "DEBUG" : "OFF"),
+        icloud_download_version: settings.icloud_download_version ?? "original",
+        skip_videos: settings.skip_videos ?? false,
+        skip_live_companions: settings.skip_live_companions ?? false,
+        skip_motion_companions: settings.skip_motion_companions ?? false,
       });
       setTokenInput("");
       setImmichApiKeyInput("");
@@ -229,6 +233,59 @@ export default function Settings() {
             <p className="font-mono text-sm mt-1 break-all">{settings.base_download_dir}</p>
             <FieldHelp>{t("settings.baseDirHelp")}</FieldHelp>
           </div>
+        </section>
+
+        <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+          <h3 className="text-lg font-medium text-emerald-300">{t("settings.downloadPolicy")}</h3>
+          <FieldHelp>{t("settings.downloadPolicyHelp")}</FieldHelp>
+
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">
+              {t("settings.icloudDownloadVersion")}
+            </label>
+            <select
+              value={form.icloud_download_version ?? "original"}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, icloud_download_version: e.target.value }))
+              }
+              className="w-full max-w-xs bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="original">{t("settings.icloudVersionOriginal")}</option>
+              <option value="medium">{t("settings.icloudVersionMedium")}</option>
+            </select>
+          </div>
+
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.skip_videos ?? false}
+              onChange={(e) => setForm((f) => ({ ...f, skip_videos: e.target.checked }))}
+              className="rounded"
+            />
+            <span>{t("settings.skipVideos")}</span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.skip_live_companions ?? false}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, skip_live_companions: e.target.checked }))
+              }
+              className="rounded"
+            />
+            <span>{t("settings.skipLiveCompanions")}</span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.skip_motion_companions ?? false}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, skip_motion_companions: e.target.checked }))
+              }
+              className="rounded"
+            />
+            <span>{t("settings.skipMotionCompanions")}</span>
+          </label>
         </section>
 
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">

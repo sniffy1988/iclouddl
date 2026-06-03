@@ -68,8 +68,8 @@ def _write_response(response: Any, dest: Path) -> None:
             f.write(response)
 
 
-def _download_asset(photo: Any, dest: Path) -> None:
-    response = download_version(photo, "original")
+def _download_asset(photo: Any, dest: Path, version: str = "original") -> None:
+    response = download_version(photo, version)
     _write_response(response, dest)
 
 
@@ -159,12 +159,14 @@ class PhotoSyncEngine:
             ).all()
         )
 
-    def _is_fully_downloaded(self, record: Photo, api_photo: Any) -> bool:
+    def _is_fully_downloaded(
+        self, record: Photo, api_photo: Any, *, require_live_companion: bool
+    ) -> bool:
         if record.status != PhotoStatus.downloaded:
             return False
         if not record.local_path or not Path(record.local_path).exists():
             return False
-        if has_live_video_component(api_photo):
+        if require_live_companion and has_live_video_component(api_photo):
             if not record.companion_local_path or not Path(record.companion_local_path).exists():
                 return False
         return True
@@ -176,17 +178,42 @@ class PhotoSyncEngine:
         base_dir: Path,
         counters: dict[str, int],
     ) -> str:
+        effective = get_effective_settings()
         asset_id = _asset_id(api_photo)
         filename = _asset_filename(api_photo)
         existing = self._photo_exists(user.id, asset_id)
 
         media = asset_media_type(api_photo) or classify_media_type(api_photo)
+        require_live = has_live_video_component(api_photo) and not effective.skip_live_companions
 
-        if existing and self._is_fully_downloaded(existing, api_photo):
+        if effective.skip_videos and media == "video":
+            record = existing or Photo(
+                user_id=user.id,
+                source=PhotoSource.icloud,
+                provider_asset_id=asset_id,
+                filename=filename,
+                status=PhotoStatus.skipped,
+                asset_date=_asset_date(api_photo),
+                media_type=media,
+                error_message="Skipped by settings (videos disabled)",
+            )
+            if not existing:
+                self.db.add(record)
+            else:
+                record.status = PhotoStatus.skipped
+                record.error_message = "Skipped by settings (videos disabled)"
+            counters["skipped"] += 1
+            return "skipped"
+
+        if existing and self._is_fully_downloaded(existing, api_photo, require_live_companion=require_live):
             counters["skipped"] += 1
             return "skipped"
 
         dest = _local_path(base_dir, api_photo, filename)
+        version = effective.icloud_download_version if effective.icloud_download_version in (
+            "original",
+            "medium",
+        ) else "original"
         record = existing or Photo(
             user_id=user.id,
             source=PhotoSource.icloud,
@@ -203,18 +230,20 @@ class PhotoSyncEngine:
             self.db.add(record)
 
         try:
-            _download_asset(api_photo, dest)
+            _download_asset(api_photo, dest, version=version)
             checksum = _sha256(dest)
             record.local_path = str(dest)
             record.file_size = dest.stat().st_size
             record.checksum_sha256 = checksum
-            companion_dest = _download_live_companion(api_photo, base_dir, filename)
+            companion_dest = None
+            if require_live:
+                companion_dest = _download_live_companion(api_photo, base_dir, filename)
             if companion_dest:
                 record.companion_local_path = str(companion_dest)
                 record.companion_media_type = "live_video"
                 record.companion_file_size = companion_dest.stat().st_size
                 record.companion_checksum_sha256 = _sha256(companion_dest)
-            elif media == "live_photo":
+            elif require_live:
                 raise ValueError("Live Photo video component download failed")
             else:
                 record.companion_local_path = None
